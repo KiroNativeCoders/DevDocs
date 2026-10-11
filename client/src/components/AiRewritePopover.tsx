@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import mermaid from 'mermaid'
 import {
   type AiMode,
   getAiConfig,
@@ -7,6 +8,48 @@ import {
 } from '../lib/ai'
 import './AiRewritePopover.css'
 import GeminiSparkleIcon from './GeminiSparkleIcon'
+
+function MermaidInlinePreview({ source }: { source: string }) {
+  const [svg, setSvg] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const renderId = `pop-mmd-${Math.random().toString(36).slice(2)}`
+    try {
+      mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' })
+      mermaid
+        .render(renderId, source)
+        .then((r) => {
+          if (!cancelled) {
+            setSvg(r.svg)
+            setError(null)
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e?.message || 'Invalid diagram')
+        })
+    } catch (e: unknown) {
+      if (!cancelled) setError(e instanceof Error ? e.message : 'Error rendering diagram')
+    }
+    return () => {
+      cancelled = true
+      document.getElementById(renderId)?.remove()
+      document.getElementById('d' + renderId)?.remove()
+    }
+  }, [source])
+
+  if (error) {
+    return <div className="mermaid-error" style={{ fontSize: 12, padding: 8, color: '#dc2626' }}>⚠️ {error}</div>
+  }
+  return (
+    <div
+      className="mermaid-popover-svg"
+      style={{ overflow: 'auto', maxHeight: 260, padding: 8, textAlign: 'center' }}
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
 
 type Props = {
   top: number
@@ -19,6 +62,7 @@ type Props = {
   onInsertBelow: (newContent: string, mode: AiMode) => void
   onClose: () => void
   onOpenSettings: () => void
+  onOpenDiagramify?: () => void
 }
 
 export default function AiRewritePopover({
@@ -32,6 +76,7 @@ export default function AiRewritePopover({
   onInsertBelow,
   onClose,
   onOpenSettings,
+  onOpenDiagramify,
 }: Props) {
   const [mode, setMode] = useState<AiMode>(initialMode)
   const [customPrompt, setCustomPrompt] = useState('')
@@ -170,6 +215,20 @@ export default function AiRewritePopover({
           <GeminiSparkleIcon size={12} />
           Tabularize
         </button>
+        <button
+          type="button"
+          className={`ai-switch-btn ${mode === 'diagram' ? 'active' : ''}`}
+          onClick={() => {
+            if (onOpenDiagramify) {
+              onOpenDiagramify()
+            } else {
+              handleModeSwitch('diagram')
+            }
+          }}
+        >
+          <GeminiSparkleIcon size={12} />
+          Diagramify
+        </button>
       </div>
 
       {/* Quote Preview */}
@@ -256,6 +315,10 @@ export default function AiRewritePopover({
                 Switch to Bullet Points
               </button>
             </div>
+          </div>
+        ) : mode === 'diagram' ? (
+          <div className="ai-diagram-box">
+            <MermaidInlinePreview source={result} />
           </div>
         ) : result.includes('<ul') || result.includes('<table') ? (
           <div

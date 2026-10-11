@@ -1,5 +1,5 @@
 export type AiProvider = 'gemini' | 'openrouter' | 'anthropic' | 'deepseek' | 'openai'
-export type AiMode = 'sentence' | 'bullet' | 'table'
+export type AiMode = 'sentence' | 'bullet' | 'table' | 'diagram'
 
 export type ModelOption = {
   id: string
@@ -142,12 +142,95 @@ export function sanitizeTableHtml(rawHtml: string): string {
 export function cleanAiFences(raw: string): string {
   let text = raw.trim()
   if (text.startsWith('```')) {
-    text = text.replace(/^```(?:html)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
+    text = text.replace(/^```(?:html|mermaid)?\s*\n?/i, '').replace(/\n?```\s*$/, '').trim()
   }
   if (text.includes('<table')) {
     text = sanitizeTableHtml(text)
   }
   return text
+}
+
+export function generateOfflineMermaid(text: string): string {
+  const cleaned = text.replace(/\r\n/g, '\n').trim()
+  if (!cleaned || cleaned.length < 15) {
+    return '⚠️ The selected text does not describe a workflow, process, or system architecture. Please select text containing sequential steps, events, decisions, or system interactions.'
+  }
+
+  // Check for workflow keywords or step structures
+  const workflowIndicators = /\b(then|after|first|next|finally|if|when|whether|submit|submits|send|sends|create|creates|save|saves|call|calls|process|processes|verify|verifies|check|checks|approve|approves|reject|rejects|flow|step|steps|api|db|database|queue|client|server|response|request)\b/i
+  const hasStepNumbers = /^\s*(\d+[.)]|[-*•])/m.test(cleaned)
+  const sentences = cleaned
+    .split(/\n+|\.\s+/)
+    .map((s) => s.replace(/^[-*•\d.]+\s*/, '').trim())
+    .filter((s) => s.length > 3)
+
+  if (sentences.length < 2 && !hasStepNumbers && !workflowIndicators.test(cleaned)) {
+    return '⚠️ The selected text does not describe a workflow, process, or system architecture. Please select text containing sequential steps, events, decisions, or system interactions.'
+  }
+
+  // If complex workflow (> 6 steps), break into modular subgraphs
+  const useStages = sentences.length > 5
+  const lines: string[] = ['flowchart TD']
+
+  let prevId = ''
+  let currentStage = 1
+  let stageOpen = false
+
+  sentences.forEach((segment, idx) => {
+    const id = `node_${idx + 1}`
+    const isDecision = /^(if|when|whether|check|verify)\b/i.test(segment) || /\?$/.test(segment)
+    const isDb = /\b(db|database|postgres|sql|mongo|redis|cache|storage|s3)\b/i.test(segment)
+    const isQueue = /\b(queue|kafka|sqs|bus|topic|event)\b/i.test(segment)
+    const isActor = /^(user|admin|client|customer|engineer|reviewer)\b/i.test(segment)
+    const safeLabel = segment.replace(/"/g, "'")
+
+    if (useStages && idx % 3 === 0) {
+      if (stageOpen) lines.push('  end')
+      lines.push(`  subgraph Stage_${currentStage} ["Phase ${currentStage}"]`)
+      stageOpen = true
+      currentStage++
+    }
+
+    const indent = stageOpen ? '    ' : '  '
+    if (isDecision) {
+      lines.push(`${indent}${id}{"${safeLabel}"}:::decision`)
+    } else if (isDb) {
+      lines.push(`${indent}${id}[("${safeLabel}")]:::storage`)
+    } else if (isQueue) {
+      lines.push(`${indent}${id}[["${safeLabel}"]]:::queue`)
+    } else if (isActor) {
+      lines.push(`${indent}${id}(["${safeLabel}"]):::actor`)
+    } else {
+      lines.push(`${indent}${id}["${safeLabel}"]:::process`)
+    }
+
+    if (prevId) {
+      const prevIsDecision = /^(if|when|whether|check|verify)\b/i.test(sentences[idx - 1]) || /\?$/.test(sentences[idx - 1])
+      if (prevIsDecision) {
+        lines.push(`  ${prevId} -->|Proceed| ${id}`)
+      } else {
+        lines.push(`  ${prevId} --> ${id}`)
+      }
+    }
+    prevId = id
+  })
+
+  if (stageOpen) {
+    lines.push('  end')
+  }
+
+  // Meaningful semantic color definitions
+  lines.push('')
+  lines.push('  classDef actor fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#1e1b4b')
+  lines.push('  classDef process fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a')
+  lines.push('  classDef decision fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f')
+  lines.push('  classDef storage fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b')
+  lines.push('  classDef queue fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87')
+  lines.push('  classDef external fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e')
+  lines.push('  classDef success fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d')
+  lines.push('  classDef failure fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337')
+
+  return lines.join('\n')
 }
 
 export function getAiConfig(): {
@@ -205,8 +288,7 @@ export async function transformText(params: {
   } else if (mode === 'bullet') {
     systemPrompt =
       'You are an expert editor. Convert the given text into crisp, clear, and well-structured bullet points while retaining all underlying information and key details without omission. If any statement is ambiguous, use the provided surrounding document context to resolve the ambiguity into precise meaning. Ensure logical progression and smooth flow between points. Eliminate all gibberish, filler words, redundancy, and unwanted text. Output ONLY an HTML unordered list (<ul><li>...</li></ul>) without markdown code fences, greetings, or commentary.'
-  } else {
-    // mode === 'table'
+  } else if (mode === 'table') {
     systemPrompt =
       'You are an expert data analyst and editor. Your task is to evaluate the SELECTED TEXT and, if appropriate, convert its key data points into a clean, compact, perfectly fitted HTML table (<table><thead><tr><th>...</th></tr></thead><tbody><tr><td>...</td></tr></tbody></table>).\n\n' +
       'CRITICAL RULES:\n' +
@@ -217,6 +299,55 @@ export async function transformText(params: {
       '4. STRICT SCOPE: Tabularize ONLY data points from the SELECTED TEXT. Use the BEFORE CONTEXT and AFTER CONTEXT strictly for background interpretation (e.g. resolving pronouns, system names, or units).\n' +
       '5. NO EMPTY ROWS OR GHOST ROWS: Absolutely DO NOT output any empty rows, blank trailing rows, or placeholder cells (e.g. <tr><td></td><td></td></tr> or cells with just spaces, dashes, or &nbsp;). Every row in <tbody> MUST contain substantive data directly from the text.\n' +
       '6. OUTPUT FORMAT: If generating a table, output ONLY the HTML table starting with <table> and ending with </table>. No markdown code fences, greetings, or explanations.'
+  } else {
+    // mode === 'diagram'
+    systemPrompt =
+      'You are a Principal Solutions Architect and Mermaid.js specialist.\n' +
+      'Your task is to transform the user\'s workflow text into a clear, beautifully structured, and syntactically valid Mermaid.js diagram.\n\n' +
+      'CRITICAL RULES:\n' +
+      '1. FEASIBILITY & WORKFLOW VALIDATION:\n' +
+      '   First evaluate if the SELECTED TEXT genuinely describes a workflow, sequential procedure, business process, marketing funnel, lifecycle, or system architecture.\n' +
+      '   If the text is merely general conversation, an opinion, a greeting, random notes, or prose WITHOUT any actionable sequence, steps, or process, DO NOT generate a diagram. Instead, return EXACTLY:\n' +
+      '   ⚠️ The selected text does not describe a workflow, process, or system architecture. Please select text containing sequential steps, events, decisions, or system interactions.\n\n' +
+      '2. STRICT FORWARD-ONLY FLOW (DAG) — ZERO BACKWARD ARROWS:\n' +
+      '   - The workflow MUST ALWAYS flow strictly FORWARD in one direction (top-to-bottom flowchart TD or left-to-right flowchart LR).\n' +
+      '   - NEVER draw backward or return arrows (e.g. Server --> User, Database --> API, Service --> Caller). In workflows, response delivery is implicitly understood and drawing backward arrows causes arrows to overlap on top of forward arrows, ruining readability.\n' +
+      '   - Skip all unwanted backward arrows completely.\n' +
+      '   - State transitions must ALWAYS advance forward: every action or decision leads forward to the next step or to a forward terminal block (e.g. SuccessTerminator(["Completed"]) or FailureTerminator(["❌ Request Rejected / Failed"])).\n' +
+      '   - NO circular loops or arrows going backwards on top of earlier blocks. Even for retries or errors, progress forward to a dedicated state node rather than looping backward.\n\n' +
+      '3. DECOMPOSITION OF COMPLEX WORKFLOWS (MODULAR BREAKDOWN):\n' +
+      '   - If the scenario is complex, has over 7-8 steps, or spans distinct tiers/stages (e.g. Auth -> Processing -> Storage -> Notification):\n' +
+      '     Organize into clear, sequential subgraphs:\n' +
+      '     subgraph Stage1 ["Stage 1: ..."] ... end\n' +
+      '     subgraph Stage2 ["Stage 2: ..."] ... end\n' +
+      '     with clear linear bridge arrows connecting the stages (Stage1_End --> Stage2_Start).\n' +
+      '   - If the text describes multiple independent workflows or distinct phases that are too complex for a single diagram, split them cleanly into multiple diagrams separated by:\n' +
+      '     ---DIAGRAM_SPLIT---\n' +
+      '     so each phase can be rendered crisply without overwhelming the user.\n\n' +
+      '4. ACTOR & COMPONENT CLASSIFICATION:\n' +
+      '   - Users / Actors: id([User / Role])\n' +
+      '   - Processes / Actions: id["Action Description"]\n' +
+      '   - Decision Blocks: id{"Condition or Decision?"}\n' +
+      '   - Databases / Storage: id[("Database / Store")]\n' +
+      '   - Message Queues / Event streams: id[["Queue / Event Stream"]]\n' +
+      '   - External Services / APIs: id{{"External API / Service"}}\n\n' +
+      '5. MEANINGFUL SEMANTIC COLOR CODING BY COMPONENT PROPERTY:\n' +
+      '   Classify the property and role of each block, and assign meaningful, distinct colors using Mermaid classDef definitions so similar boxes share an intuitive color identity:\n' +
+      '   - Actors / Users (Indigo / Lavender): classDef actor fill:#e0e7ff,stroke:#4f46e5,stroke-width:2px,color:#1e1b4b\n' +
+      '   - Work / Core Processes (Slate / Gray): classDef process fill:#f1f5f9,stroke:#64748b,stroke-width:2px,color:#0f172a\n' +
+      '   - Decision / Verification Blocks (Warm Amber / Gold): classDef decision fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f\n' +
+      '   - Databases & Storage (Teal / Emerald): classDef storage fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b\n' +
+      '   - Message Queues & Event Streams (Purple / Violet): classDef queue fill:#f3e8ff,stroke:#9333ea,stroke-width:2px,color:#581c87\n' +
+      '   - External 3rd Party APIs (Sky Blue / Cyan): classDef external fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e\n' +
+      '   - Success / Final Outcomes (Soft Mint / Green): classDef success fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d\n' +
+      '   - Failure / Rejection / Abort (Soft Rose / Red): classDef failure fill:#ffe4e6,stroke:#e11d48,stroke-width:2px,color:#881337\n' +
+      '   Assign classes to every node using either postfix notation `id["Label"]:::className` or `class <id> <className>` declarations at the bottom of the diagram.\n\n' +
+      '6. STRICT SYNTAX SAFETY:\n' +
+      '   - ALWAYS enclose node labels in double quotes: id["Description"]. Never leave raw parentheses, brackets, or colons unquoted.\n' +
+      '   - Use alphanumeric IDs without spaces (e.g. usr_1, api_gw, db_orders).\n' +
+      '   - Never use reserved words (end, graph, subgraph, click) as node IDs.\n\n' +
+      '7. OUTPUT FORMAT:\n' +
+      '   Output ONLY the raw Mermaid diagram (or fenced with ```mermaid). No chatter, greetings, or markdown explanations.'
   }
 
   const userContent =
@@ -377,6 +508,11 @@ export async function transformText(params: {
       if (out) return cleanAiFences(out)
       throw new Error('Anthropic returned an empty response')
     }
+  }
+
+  // If no live key is configured but user requested Diagramify, provide smart offline conversion
+  if (mode === 'diagram') {
+    return generateOfflineMermaid(text)
   }
 
   // No live key configured — do NOT silently echo the text back. The AI key is

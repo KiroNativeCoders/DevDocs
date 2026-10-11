@@ -76,29 +76,52 @@
   transition: background 0.15s ease;
 }
 
-/* Diagram Sizing */
+/* Diagram Sizing & Wrapper */
+.mermaid-svg-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  transition: width 0.12s ease-out;
+}
+
 .mermaid-svg {
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
-  transition: max-width 0.18s ease;
+  transition: transform 0.12s ease-out;
 }
 
-.mermaid-preview.size-small .mermaid-svg {
-  max-width: 380px;
-}
-
-.mermaid-preview.size-medium .mermaid-svg {
-  max-width: 620px;
-}
-
-/* Crucial: Override Mermaid's inline style="max-width: ...px" on generated SVG */
+/* Crucial: Respect natural Mermaid diagram scale, no forced 100% expansion */
 .mermaid-svg svg {
-  width: 100% !important;
+  display: block;
+  margin: 0 auto;
   max-width: 100% !important;
   height: auto !important;
-  display: block;
+}
+
+.mermaid-preview.size-auto .mermaid-svg-wrapper {
+  max-width: 100%;
+}
+
+.mermaid-preview.size-small .mermaid-svg-wrapper {
+  max-width: 360px;
+}
+
+.mermaid-preview.size-medium .mermaid-svg-wrapper {
+  max-width: 560px;
+}
+
+.mermaid-preview.size-large .mermaid-svg-wrapper {
+  max-width: 800px;
+}
+
+.mermaid-preview.size-full .mermaid-svg-wrapper {
+  width: 100%;
+  max-width: 100%;
 }
 
 .mermaid-error {
@@ -319,3 +342,217 @@
   border-color: #7f1d1d;
   color: #fca5a5;
 }
+
+/* Inline Mermaid Code Drawer */
+.mermaid-code-drawer {
+  border-top: 1px solid #e2e8f0;
+  background: #0f172a;
+  animation: mmSlideDown 0.15s ease-out;
+}
+
+@keyframes mmSlideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 400px;
+  }
+}
+
+.mermaid-code-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.mermaid-code-drawer-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mermaid-code-copy-btn {
+  background: #334155;
+  border: 1px solid #475569;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mermaid-code-copy-btn:hover {
+  background: #475569;
+  color: #ffffff;
+}
+
+.mermaid-code-drawer-content {
+  margin: 0;
+  padding: 14px 16px;
+  font-family: 'JetBrains Mono', 'Fira Code', Menlo, Monaco, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #38bdf8;
+  background: #090d16;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.mermaid-tool-btn.is-active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #2563eb;
+}
+
+[data-theme="dark"] .mermaid-tool-btn.is-active {
+  background: #1f6feb;
+  color: #ffffff;
+  border-color: #388bfd;
+}
+
+/* Scale / Zoom Switcher */
+.mermaid-scale-switcher {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dcdbd7;
+  border-radius: 6px;
+  padding: 2px 3px;
+  gap: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.mermaid-scale-btn {
+  border: none;
+  background: transparent;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 700;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.mermaid-scale-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.mermaid-scale-label {
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  padding: 0 3px;
+  min-width: 36px;
+  text-align: center;
+  transition: color 0.12s ease;
+}
+
+.mermaid-scale-label:hover {
+  color: #2563eb;
+}
+
+/* Horizontal Drag-to-Resize Handle */
+.mermaid-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  cursor: ew-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  user-select: none;
+  z-index: 10;
+}
+
+.mermaid-preview:hover .mermaid-resize-handle,
+.mermaid-preview.is-resizing .mermaid-resize-handle {
+  opacity: 1;
+}
+
+.mermaid-resize-handle-bar {
+  width: 4px;
+  height: 38px;
+  background: #cbd5e1;
+  border-radius: 4px;
+  transition: all 0.12s ease;
+}
+
+.mermaid-resize-handle:hover .mermaid-resize-handle-bar,
+.mermaid-preview.is-resizing .mermaid-resize-handle-bar {
+  background: #2563eb;
+  height: 52px;
+  width: 5px;
+}
+
+.mermaid-resize-badge {
+  position: absolute;
+  bottom: -24px;
+  background: #1e293b;
+  color: #f8fafc;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+/* Dark theme overrides for scale switcher and resize handle */
+[data-theme="dark"] .mermaid-scale-switcher {
+  background: #21262d;
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .mermaid-scale-btn {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .mermaid-scale-btn:hover {
+  background: #30363d;
+  color: #f0f6fc;
+}
+
+[data-theme="dark"] .mermaid-scale-label {
+  color: #c9d1d9;
+}
+
+[data-theme="dark"] .mermaid-scale-label:hover {
+  color: #58a6ff;
+}
+
+[data-theme="dark"] .mermaid-resize-handle-bar {
+  background: #30363d;
+}
+
+[data-theme="dark"] .mermaid-resize-handle:hover .mermaid-resize-handle-bar,
+[data-theme="dark"] .mermaid-preview.is-resizing .mermaid-resize-handle-bar {
+  background: #388bfd;
+}
+
+

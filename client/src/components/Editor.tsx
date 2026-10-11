@@ -22,6 +22,7 @@ import { CommentMark } from './CommentMark'
 import { MermaidNode } from './Mermaid'
 import { CodeRef } from './CodeRef'
 import MermaidModal from './MermaidModal'
+import DiagramifyModal from './DiagramifyModal'
 import { docs, comments, images, type Role, type Thread as ThreadT, type DocStatus } from '../lib/api'
 import { accessToken } from '../lib/supabase'
 import { makeIdentity, type Identity } from '../lib/identity'
@@ -522,6 +523,7 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                 { label: 'Divider', disabled: !canEdit, onClick: () => ed?.chain().focus().setHorizontalRule().run() },
                 { label: 'Image…', disabled: !canEdit, onClick: () => imageInputRef.current?.click() },
                 { label: 'Mermaid diagram', disabled: !canEdit, onClick: () => ed?.chain().focus().insertMermaid().run() },
+                { label: '✨ Diagramify with AI…', disabled: !canEdit, onClick: () => window.dispatchEvent(new CustomEvent('dx-open-ai', { detail: 'diagram' })) },
                 { label: 'Code reference (GitHub)…', disabled: !canEdit, onClick: () => ed?.chain().focus().insertCodeRef().run() },
               ]}
             />
@@ -1006,22 +1008,44 @@ function CollabEditor({
     to: number
   } | null>(null)
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
+  const [diagramifyModal, setDiagramifyModal] = useState<{
+    selectedText: string
+    contextBefore?: string
+    contextAfter?: string
+    from: number
+    to: number
+  } | null>(null)
 
   const openAiPopover = useCallback(
     (mode: AiMode = 'sentence') => {
       if (!editor || !bubble) return
-      // Require an AI key first — open settings if none is configured.
-      if (!getAiConfig().key) {
-        setBubble(null)
-        setAiSettingsOpen(true)
-        return
-      }
       const { from, to } = editor.state.selection
       if (from === to) return
       const selectedText = editor.state.doc.textBetween(from, to, ' ')
       const docSize = editor.state.doc.content.size
       const contextBefore = editor.state.doc.textBetween(Math.max(0, from - 1000), from, ' ')
       const contextAfter = editor.state.doc.textBetween(to, Math.min(docSize, to + 1000), ' ')
+
+      // Diagramify opens the large full-page workflow studio modal directly
+      if (mode === 'diagram') {
+        setDiagramifyModal({
+          selectedText,
+          contextBefore,
+          contextAfter,
+          from,
+          to,
+        })
+        setBubble(null)
+        return
+      }
+
+      // Require an AI key first — open settings if none is configured.
+      if (!getAiConfig().key) {
+        setBubble(null)
+        setAiSettingsOpen(true)
+        return
+      }
+
       setAiPopover({
         top: bubble.top + 34,
         left: bubble.left,
@@ -1037,15 +1061,50 @@ function CollabEditor({
     [editor, bubble],
   )
 
-  const triggerAiFromToolbar = useCallback(() => {
+  const triggerAiFromToolbar = useCallback((targetMode: AiMode = 'sentence') => {
     if (!editor) return
-    // Require an AI key first — open settings if none is configured.
+    const { from, to } = editor.state.selection
+    const docSize = editor.state.doc.content.size
+
+    // Diagramify opens the large full-screen studio modal directly
+    if (targetMode === 'diagram') {
+      if (from !== to) {
+        const selectedText = editor.state.doc.textBetween(from, to, ' ')
+        const contextBefore = editor.state.doc.textBetween(Math.max(0, from - 1000), from, ' ')
+        const contextAfter = editor.state.doc.textBetween(to, Math.min(docSize, to + 1000), ' ')
+        setDiagramifyModal({
+          selectedText,
+          contextBefore,
+          contextAfter,
+          from,
+          to,
+        })
+      } else {
+        const $from = editor.state.selection.$from
+        const node = $from.parent
+        if (node && node.isTextblock && node.textContent.trim()) {
+          const startPos = $from.start()
+          const endPos = $from.end()
+          const contextBefore = editor.state.doc.textBetween(Math.max(0, startPos - 1000), startPos, ' ')
+          const contextAfter = editor.state.doc.textBetween(endPos, Math.min(docSize, endPos + 1000), ' ')
+          setDiagramifyModal({
+            selectedText: node.textContent,
+            contextBefore,
+            contextAfter,
+            from: startPos,
+            to: endPos,
+          })
+        }
+      }
+      return
+    }
+
+    // Require an AI key first for other modes
     if (!getAiConfig().key) {
       setAiSettingsOpen(true)
       return
     }
-    const { from, to } = editor.state.selection
-    const docSize = editor.state.doc.content.size
+
     if (from !== to) {
       const start = editor.view.coordsAtPos(from)
       const end = editor.view.coordsAtPos(to)
@@ -1055,7 +1114,7 @@ function CollabEditor({
       setAiPopover({
         top: start.top + 30,
         left: (start.left + end.left) / 2,
-        mode: 'sentence',
+        mode: targetMode,
         selectedText,
         contextBefore,
         contextAfter,
@@ -1074,7 +1133,7 @@ function CollabEditor({
         setAiPopover({
           top: coords.top + 30,
           left: coords.left + 140,
-          mode: 'sentence',
+          mode: targetMode,
           selectedText: node.textContent,
           contextBefore,
           contextAfter,
@@ -1085,38 +1144,66 @@ function CollabEditor({
     }
   }, [editor])
 
+  useEffect(() => {
+    const onOpenAiEvent = (e: Event) => {
+      const mode = (e as CustomEvent<AiMode>).detail || 'sentence'
+      triggerAiFromToolbar(mode)
+    }
+    window.addEventListener('dx-open-ai', onOpenAiEvent)
+    return () => window.removeEventListener('dx-open-ai', onOpenAiEvent)
+  }, [triggerAiFromToolbar])
+
   const handleAiReplace = useCallback(
-    (newContent: string, _mode: AiMode) => {
+    (newContent: string, mode: AiMode) => {
       if (!editor || !aiPopover) return
       const { from, to } = aiPopover
-      const contentToInsert = newContent.includes('<table')
-        ? sanitizeTableHtml(newContent)
-        : newContent
-      editor
-        .chain()
-        .focus()
-        .deleteRange({ from, to })
-        .insertContent(contentToInsert)
-        .run()
+      if (mode === 'diagram') {
+        editor
+          .chain()
+          .focus()
+          .deleteRange({ from, to })
+          .insertMermaid(newContent)
+          .run()
+      } else {
+        const contentToInsert = newContent.includes('<table')
+          ? sanitizeTableHtml(newContent)
+          : newContent
+        editor
+          .chain()
+          .focus()
+          .deleteRange({ from, to })
+          .insertContent(contentToInsert)
+          .run()
+      }
       setAiPopover(null)
     },
     [editor, aiPopover],
   )
 
   const handleAiInsertBelow = useCallback(
-    (newContent: string, _mode: AiMode) => {
+    (newContent: string, mode: AiMode) => {
       if (!editor || !aiPopover) return
       const { to } = aiPopover
-      const contentToInsert = newContent.includes('<table')
-        ? sanitizeTableHtml(newContent)
-        : newContent
-      editor
-        .chain()
-        .focus()
-        .setTextSelection(to)
-        .insertContent('<p></p>')
-        .insertContent(contentToInsert)
-        .run()
+      if (mode === 'diagram') {
+        editor
+          .chain()
+          .focus()
+          .setTextSelection(to)
+          .insertContent('<p></p>')
+          .insertMermaid(newContent)
+          .run()
+      } else {
+        const contentToInsert = newContent.includes('<table')
+          ? sanitizeTableHtml(newContent)
+          : newContent
+        editor
+          .chain()
+          .focus()
+          .setTextSelection(to)
+          .insertContent('<p></p>')
+          .insertContent(contentToInsert)
+          .run()
+      }
       setAiPopover(null)
     },
     [editor, aiPopover],
@@ -1179,6 +1266,15 @@ function CollabEditor({
             <GeminiSparkleIcon size={14} />
             <span>Tabularize</span>
           </button>
+          <button
+            type="button"
+            className="ai-bubble-btn ai-bubble-btn--ai"
+            onClick={() => openAiPopover('diagram')}
+            title="Auto-convert workflow scenario into a Mermaid diagram with AI"
+          >
+            <GeminiSparkleIcon size={14} />
+            <span>Diagramify</span>
+          </button>
         </div>
       )}
 
@@ -1193,6 +1289,48 @@ function CollabEditor({
           onReplace={handleAiReplace}
           onInsertBelow={handleAiInsertBelow}
           onClose={() => setAiPopover(null)}
+          onOpenSettings={() => setAiSettingsOpen(true)}
+          onOpenDiagramify={() => {
+            setDiagramifyModal({
+              selectedText: aiPopover.selectedText,
+              contextBefore: aiPopover.contextBefore,
+              contextAfter: aiPopover.contextAfter,
+              from: aiPopover.from,
+              to: aiPopover.to,
+            })
+            setAiPopover(null)
+          }}
+        />
+      )}
+
+      {diagramifyModal && (
+        <DiagramifyModal
+          isOpen={true}
+          selectedText={diagramifyModal.selectedText}
+          contextBefore={diagramifyModal.contextBefore}
+          contextAfter={diagramifyModal.contextAfter}
+          onInsertBelow={(mermaidCode) => {
+            if (!editor) return
+            editor
+              .chain()
+              .focus()
+              .setTextSelection(diagramifyModal.to)
+              .insertContent('<p></p>')
+              .insertMermaid(mermaidCode)
+              .run()
+            setDiagramifyModal(null)
+          }}
+          onReplace={(mermaidCode) => {
+            if (!editor) return
+            editor
+              .chain()
+              .focus()
+              .deleteRange({ from: diagramifyModal.from, to: diagramifyModal.to })
+              .insertMermaid(mermaidCode)
+              .run()
+            setDiagramifyModal(null)
+          }}
+          onClose={() => setDiagramifyModal(null)}
           onOpenSettings={() => setAiSettingsOpen(true)}
         />
       )}
