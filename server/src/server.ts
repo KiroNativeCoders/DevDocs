@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './auth.js'
+import { listTokens, mintToken, revokeToken } from './tokens.js'
 
 /**
  * Scope C server: thin. Supabase Postgres + RLS now own all document / comment
@@ -282,6 +283,37 @@ app.get('/api/docs/:id/reviews', requireAuth, async (req, res) => {
     .order('created_at', { ascending: true })
   if (error) return res.status(500).json({ error: error.message })
   res.json(data ?? [])
+})
+
+// ------------------------------------------------------------- API tokens
+// Personal tokens for the remote MCP server. The raw token is returned ONCE on
+// creation and never stored (only its hash). All run as the authenticated user.
+app.get('/api/tokens', requireAuth, async (req, res) => {
+  try {
+    res.json(await listTokens(req.user!.id))
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to list tokens' })
+  }
+})
+
+app.post('/api/tokens', requireAuth, async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim().slice(0, 80) : ''
+  const scope = req.body?.scope === 'read_only' ? 'read_only' : 'read_write'
+  try {
+    const { raw, token } = await mintToken(req.user!.id, name, scope)
+    res.json({ raw, token }) // raw shown ONCE
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to create token' })
+  }
+})
+
+app.delete('/api/tokens/:id', requireAuth, async (req, res) => {
+  try {
+    await revokeToken(req.user!.id, String(req.params.id))
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to revoke token' })
+  }
 })
 
 // The collab relay is a raw WebSocket and reads its token from the query

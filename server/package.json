@@ -9,14 +9,17 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "collab": "tsx watch src/collab.ts",
+    "mcp": "tsx watch src/mcp.ts",
     "test:concurrent": "node scripts/concurrent-test.mjs",
-    "test:comments": "node scripts/comments-test.mjs"
+    "test:comments": "node scripts/comments-test.mjs",
+    "test:mcp": "node scripts/mcp-test.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@supabase/supabase-js": "^2.117.2",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
@@ -37,7 +40,7 @@
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.6.3",
-    "@types/ws": "^8.18.1",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "y-websocket": "^1.5.4"

@@ -4,6 +4,7 @@ import Editor from './components/Editor'
 import Home from './components/Home'
 import Auth from './components/Auth'
 import ShareDialog from './components/ShareDialog'
+import ConnectAiModal from './components/ConnectAiModal'
 import { auth, docs, type User, type DocDetail } from './lib/api'
 import { pushRecent } from './lib/recent'
 import './App.css'
@@ -32,6 +33,7 @@ export default function App() {
   const [detail, setDetail] = useState<DocDetail | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [sharing, setSharing] = useState(false)
+  const [connectOpen, setConnectOpen] = useState(false)
 
   // Navigate: push a new URL and update selection. Passing null goes home (/).
   const navigate = useCallback((id: string | null) => {
@@ -131,6 +133,7 @@ export default function App() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           <span className="user-email">{user.name || user.email}</span>
+          <button className="header-btn" onClick={() => setConnectOpen(true)} title="Connect an AI agent via MCP">Connect AI</button>
           <button className="header-btn ghost" onClick={logout}>Log out</button>
         </div>
       </header>
@@ -164,6 +167,7 @@ export default function App() {
       {sharing && selectedId && detail && (
         <ShareDialog docId={selectedId} isOwner={detail.role === 'OWNER'} onClose={() => setSharing(false)} />
       )}
+      <ConnectAiModal isOpen={connectOpen} onClose={() => setConnectOpen(false)} />
     </div>
   )
 }

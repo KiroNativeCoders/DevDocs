@@ -9,7 +9,6 @@ type Props = {
   font?: FontKey
   onChangeFont?: (font: FontKey) => void
   onOpenAi?: () => void
-  onOpenAiSettings?: () => void
 }
 
 function Btn({
@@ -55,7 +54,6 @@ export default function Toolbar({
   font,
   onChangeFont,
   onOpenAi,
-  onOpenAiSettings,
 }: Props) {
   if (!editor) return null
 
@@ -184,17 +182,6 @@ export default function Toolbar({
               <GeminiSparkleIcon size={14} />
               AI Buddy
             </button>
-            {onOpenAiSettings && (
-              <button
-                type="button"
-                className="tb-btn tb-ai-gear"
-                title="AI Provider & Model Settings"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={onOpenAiSettings}
-              >
-                ⚙️
-              </button>
-            )}
           </div>
         </>
       )}

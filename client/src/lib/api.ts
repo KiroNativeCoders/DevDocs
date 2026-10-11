@@ -558,6 +558,38 @@ export const reviewers = {
   },
 }
 
+// ------------------------------------------------------ API tokens (MCP)
+export type ApiToken = {
+  id: string
+  name: string | null
+  scope: 'read_only' | 'read_write'
+  last_used_at: string | null
+  created_at: string
+  revoked_at: string | null
+}
+
+export const tokens = {
+  list: async (): Promise<ApiToken[]> => {
+    const res = await fetch(`${BASE}/api/tokens`, { headers: await authHeaders() })
+    if (!res.ok) throw new ApiError(res.status, `Could not load tokens (${res.status})`)
+    return (await res.json()) as ApiToken[]
+  },
+  // Returns the RAW token exactly once.
+  create: async (name: string, scope: 'read_only' | 'read_write' = 'read_write'): Promise<{ raw: string; token: ApiToken }> => {
+    const res = await fetch(`${BASE}/api/tokens`, {
+      method: 'POST',
+      headers: await authHeaders(true),
+      body: JSON.stringify({ name, scope }),
+    })
+    if (!res.ok) throw new ApiError(res.status, `Could not create token (${res.status})`)
+    return (await res.json()) as { raw: string; token: ApiToken }
+  },
+  revoke: async (id: string): Promise<void> => {
+    const res = await fetch(`${BASE}/api/tokens/${id}`, { method: 'DELETE', headers: await authHeaders() })
+    if (!res.ok) throw new ApiError(res.status, `Could not revoke token (${res.status})`)
+  },
+}
+
 // ---------------------------------------------------------------- images
 export const images = {
   // Upload an image file to Supabase Storage and return its public URL. The

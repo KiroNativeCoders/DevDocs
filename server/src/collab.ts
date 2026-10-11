@@ -41,21 +41,35 @@ server.on('upgrade', async (req, socket, head) => {
     const docName = url.pathname.slice(1) || 'default'
     const token = url.searchParams.get('token') ?? ''
 
-    const session = await verifyToken(token)
-    if (!session) {
-      console.warn(`[collab] reject ${docName}: unauthenticated`)
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
-      socket.destroy()
-      return
+    // Internal server-to-server path (the MCP server). A trusted caller presents
+    // the shared MCP_INTERNAL_SECRET plus the user id it is acting as; we still
+    // run getAccess for that user, so authorization is identical to a browser.
+    const internal = url.searchParams.get('internal') ?? ''
+    const actingAs = url.searchParams.get('as') ?? ''
+    const INTERNAL_SECRET = process.env.MCP_INTERNAL_SECRET ?? ''
+    let userId: string | null = null
+
+    if (internal && INTERNAL_SECRET && internal === INTERNAL_SECRET && actingAs) {
+      userId = actingAs
+    } else {
+      const session = await verifyToken(token)
+      if (!session) {
+        console.warn(`[collab] reject ${docName}: unauthenticated`)
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+        socket.destroy()
+        return
+      }
+      userId = session.id
     }
-    const access = await getAccess(session.id, docName)
+
+    const access = await getAccess(userId, docName)
     if (!access) {
-      console.warn(`[collab] reject ${docName}: user ${session.id} no access`)
+      console.warn(`[collab] reject ${docName}: user ${userId} no access`)
       socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
       socket.destroy()
       return
     }
-    console.log(`[collab] accept ${docName}: user ${session.id} role=${access.role}`)
+    console.log(`[collab] accept ${docName}: user ${userId} role=${access.role}`)
 
     wss.handleUpgrade(req, socket, head, (conn) => {
       setupWSConnection(conn, req, { docName, gc: true })

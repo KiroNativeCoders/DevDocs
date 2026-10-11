@@ -1246,7 +1246,6 @@ function CollabEditor({
           font={font}
           onChangeFont={onChangeFont}
           onOpenAi={triggerAiFromToolbar}
-          onOpenAiSettings={() => setAiSettingsOpen(true)}
         />
       )}
       <EditorContent editor={editor} className={`editor-content font-${font}`} />
