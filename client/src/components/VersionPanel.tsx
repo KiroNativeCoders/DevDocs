@@ -5,10 +5,8 @@ import './VersionPanel.css'
 type Props = {
   docId: string
   canEdit: boolean
-  /** Capture the current Yjs state as a base64 update string. */
-  snapshot: () => string | null
-  /** Apply a base64 Yjs update onto the live document (restore). */
-  applyUpdate: (base64: string) => void
+  /** Replay a restore chain (keyframe + deltas, base64) onto the live doc. */
+  applyChain: (chain: string[]) => void
   onClose: () => void
 }
 
@@ -21,33 +19,36 @@ function when(iso: string) {
   })
 }
 
-export default function VersionPanel({ docId, canEdit, snapshot, applyUpdate, onClose }: Props) {
+export default function VersionPanel({ docId, canEdit, applyChain, onClose }: Props) {
   const [list, setList] = useState<DocVersion[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function load() {
+  async function load(silent = false) {
     try {
       setList(await versionsApi.list(docId))
+      if (silent) setError(null)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to load versions')
+      // Polling loads stay quiet on transient errors; only an explicit load
+      // surfaces them, so the list doesn't flash an error between ticks.
+      if (!silent) setError(e instanceof ApiError ? e.message : 'Failed to load versions')
     }
   }
   useEffect(() => {
     load()
+    // Timer snapshots land server-side, so poll while the panel is open to keep
+    // the list fresh without needing to reopen it.
+    const id = setInterval(() => load(true), 15_000)
+    return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId])
 
   async function save() {
     setError(null)
-    const update = snapshot()
-    if (!update) {
-      setError('Document not ready yet')
-      return
-    }
     setBusy(true)
     try {
-      await versionsApi.create(docId, update)
+      // The server reads the live relay doc and records the version.
+      await versionsApi.create(docId)
       await load()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to save version')
@@ -60,8 +61,8 @@ export default function VersionPanel({ docId, canEdit, snapshot, applyUpdate, on
     if (!window.confirm('Restore this version? Current content will be replaced by it.')) return
     setBusy(true)
     try {
-      const full = await versionsApi.get(docId, v.id)
-      applyUpdate(full.update)
+      const { chain } = await versionsApi.chain(docId, v.seq)
+      applyChain(chain)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to restore')
     } finally {
@@ -72,7 +73,7 @@ export default function VersionPanel({ docId, canEdit, snapshot, applyUpdate, on
   async function remove(v: DocVersion) {
     if (!window.confirm('Delete this version?')) return
     try {
-      await versionsApi.remove(docId, v.id)
+      await versionsApi.remove(docId, v.seq)
       await load()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Failed to delete')
@@ -83,7 +84,7 @@ export default function VersionPanel({ docId, canEdit, snapshot, applyUpdate, on
     <aside className="version-panel">
       <div className="version-head">
         <span className="version-title">Version history</span>
-        <button className="version-close" onClick={onClose} aria-label="Close">✕</button>
+        <button className="version-close" onClick={onClose} aria-label="Close">Close</button>
       </div>
 
       {canEdit && (
@@ -99,12 +100,15 @@ export default function VersionPanel({ docId, canEdit, snapshot, applyUpdate, on
       ) : (
         <ul className="version-list">
           {list.map((v) => (
-            <li key={v.id} className="version-row">
+            <li key={v.seq} className="version-row">
               <div className="version-info">
-                <span className="version-label">{v.label || 'Version'}</span>
+                <span className="version-label">
+                  {v.label || `Version ${v.seq}`}
+                  {v.source === 'timer' && <span className="version-tag">Auto</span>}
+                </span>
                 <span className="version-meta">
                   {when(v.created_at)}
-                  {v.author?.email ? ` · ${v.author.name || v.author.email}` : ''}
+                  {v.author?.email ? ` · ${v.author.name || v.author.email}` : v.source === 'timer' ? ' · automatic' : ''}
                 </span>
               </div>
               {canEdit && (

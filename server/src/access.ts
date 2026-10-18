@@ -15,7 +15,7 @@ export type Role = 'OWNER' | 'EDITOR' | 'VIEWER' | 'MANAGER'
 export type Access = { role: Role } | null
 
 let client: SupabaseClient | null = null
-function supa(): SupabaseClient {
+export function supa(): SupabaseClient {
   if (!client) {
     const url = process.env.SUPABASE_URL ?? ''
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''

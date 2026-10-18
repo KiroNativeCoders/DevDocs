@@ -52,6 +52,18 @@
 }
 .version-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .version-label { font-size: 13px; font-weight: 600; color: #1f2328; }
+.version-tag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #57606a;
+  background: #eaeef2;
+  border-radius: 4px;
+  padding: 1px 5px;
+  vertical-align: middle;
+}
 .version-meta { font-size: 11px; color: #a0a4ab; margin-top: 2px; }
 .version-actions { display: flex; gap: 6px; }
 .vbtn {

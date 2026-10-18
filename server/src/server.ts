@@ -4,6 +4,8 @@ import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from './auth.js'
 import { listTokens, mintToken, revokeToken } from './tokens.js'
+import { withLiveDoc } from './docbody.js'
+import { saveVersion } from './snapshots.js'
 
 /**
  * Scope C server: thin. Supabase Postgres + RLS now own all document / comment
@@ -190,65 +192,107 @@ app.get('/api/docs/:id/versions', requireAuth, async (req, res) => {
   if (!r.cap) return res.status(403).json({ error: 'No access to this document' })
   const { data, error } = await admin
     .from('document_version')
-    .select('id,label,created_at,author:app_user(id,email,name)')
+    .select('id,seq,label,source,is_keyframe,created_at,author:app_user(id,email,name)')
     .eq('document_id', req.params.id)
-    .order('created_at', { ascending: false })
+    .order('seq', { ascending: false })
   if (error) return res.status(500).json({ error: error.message })
   res.json(data ?? [])
 })
 
-// Create a version from a base64-encoded Yjs state update.
+// Create a version. Reads the live relay doc server-side and routes through the
+// shared saveVersion (same delta/keyframe + seq logic as the timer), so a
+// manual save and a timer save are produced identically. `force` is set so a
+// manual save always records a version even if the state vector is unchanged.
 app.post('/api/docs/:id/versions', requireAuth, async (req, res) => {
-  const r = await docCapability(req.user!.id, String(req.params.id))
+  const docId = String(req.params.id)
+  const r = await docCapability(req.user!.id, docId)
   if (!r.exists) return res.status(404).json({ error: 'Document not found' })
   if (r.cap !== 'owner' && r.cap !== 'editor') {
     return res.status(403).json({ error: 'Only editors can save a version' })
   }
-  const b64 = typeof req.body?.update === 'string' ? req.body.update : ''
   const label = typeof req.body?.label === 'string' && req.body.label.trim() ? req.body.label.trim() : null
-  if (!b64) return res.status(400).json({ error: 'update (base64) is required' })
-  // Postgres bytea over PostgREST accepts a hex string prefixed with \x.
-  const hex = '\\x' + Buffer.from(b64, 'base64').toString('hex')
-  const { data, error } = await admin
-    .from('document_version')
-    .insert({ document_id: req.params.id, update_blob: hex, label, created_by: req.user!.id })
-    .select('id,label,created_at')
-    .single()
-  if (error) return res.status(500).json({ error: error.message })
-  res.json(data)
+  try {
+    const result = await withLiveDoc(docId, req.user!.id, (doc) =>
+      saveVersion(docId, doc, { source: 'manual', createdBy: req.user!.id, label, force: true }),
+    )
+    if (!result) return res.status(500).json({ error: 'Could not capture document state' })
+    res.json({ seq: result.seq, is_keyframe: result.isKeyframe, label })
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : 'Failed to save version' })
+  }
 })
 
-// Fetch one version's bytes (base64) for preview/restore.
-app.get('/api/docs/:id/versions/:vid', requireAuth, async (req, res) => {
-  const r = await docCapability(req.user!.id, String(req.params.id))
+// Fetch the restore chain for a target version: the nearest keyframe at or
+// before `seq`, then every delta from there up to `seq`, in ascending order.
+// The client replays these onto a fresh Y.Doc to reconstruct that version.
+app.get('/api/docs/:id/versions/:seq/chain', requireAuth, async (req, res) => {
+  const docId = String(req.params.id)
+  const targetSeq = Number(req.params.seq)
+  const r = await docCapability(req.user!.id, docId)
   if (!r.exists) return res.status(404).json({ error: 'Document not found' })
   if (!r.cap) return res.status(403).json({ error: 'No access to this document' })
-  const { data, error } = await admin
+  if (!Number.isFinite(targetSeq)) return res.status(400).json({ error: 'Bad seq' })
+
+  // Nearest keyframe at or before the target.
+  const { data: kf, error: kfErr } = await admin
     .from('document_version')
-    .select('id,label,created_at,update_blob')
-    .eq('id', req.params.vid)
-    .eq('document_id', req.params.id)
+    .select('seq')
+    .eq('document_id', docId)
+    .eq('is_keyframe', true)
+    .lte('seq', targetSeq)
+    .order('seq', { ascending: false })
+    .limit(1)
     .maybeSingle()
+  if (kfErr) return res.status(500).json({ error: kfErr.message })
+  if (!kf) return res.status(404).json({ error: 'No keyframe to root this version' })
+
+  // Keyframe + all deltas up to the target, in order.
+  const { data: rows, error } = await admin
+    .from('document_version')
+    .select('seq,delta_blob,is_keyframe')
+    .eq('document_id', docId)
+    .gte('seq', kf.seq as number)
+    .lte('seq', targetSeq)
+    .order('seq', { ascending: true })
   if (error) return res.status(500).json({ error: error.message })
-  if (!data) return res.status(404).json({ error: 'Version not found' })
-  // update_blob comes back as a \x-prefixed hex string; convert to base64.
-  const hex = String(data.update_blob).replace(/^\\x/, '')
-  const update = Buffer.from(hex, 'hex').toString('base64')
-  res.json({ id: data.id, label: data.label, created_at: data.created_at, update })
+
+  const chain = (rows ?? []).map((row) => {
+    const hex = String(row.delta_blob).replace(/^\\x/, '')
+    return Buffer.from(hex, 'hex').toString('base64')
+  })
+  res.json({ target: targetSeq, from_keyframe: kf.seq, chain })
 })
 
-// Delete a version (editors only).
-app.delete('/api/docs/:id/versions/:vid', requireAuth, async (req, res) => {
-  const r = await docCapability(req.user!.id, String(req.params.id))
+// Delete a version (editors only). A delta can't be deleted if a LATER delta
+// depends on it (would break the chain); only a version with no dependent delta
+// after it, or a keyframe superseded by a later keyframe, is safe to drop here.
+app.delete('/api/docs/:id/versions/:seq', requireAuth, async (req, res) => {
+  const docId = String(req.params.id)
+  const seq = Number(req.params.seq)
+  const r = await docCapability(req.user!.id, docId)
   if (!r.exists) return res.status(404).json({ error: 'Document not found' })
   if (r.cap !== 'owner' && r.cap !== 'editor') {
     return res.status(403).json({ error: 'Only editors can delete a version' })
   }
+  // Safe to delete only if it is the latest version OR the next version is a
+  // keyframe (which doesn't depend on this row). Otherwise deleting would
+  // orphan the delta chain — refuse rather than corrupt history.
+  const { data: next } = await admin
+    .from('document_version')
+    .select('seq,is_keyframe')
+    .eq('document_id', docId)
+    .gt('seq', seq)
+    .order('seq', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+  if (next && !next.is_keyframe) {
+    return res.status(409).json({ error: 'Cannot delete: a later version depends on this one' })
+  }
   const { error } = await admin
     .from('document_version')
     .delete()
-    .eq('id', req.params.vid)
-    .eq('document_id', req.params.id)
+    .eq('document_id', docId)
+    .eq('seq', seq)
   if (error) return res.status(500).json({ error: error.message })
   res.json({ ok: true })
 })

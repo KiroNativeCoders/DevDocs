@@ -435,7 +435,10 @@ export const comments = {
 // -------------------------------------------------------------- versions
 export type DocVersion = {
   id: string
+  seq: number
   label: string | null
+  source: 'manual' | 'timer'
+  is_keyframe: boolean
   created_at: string
   author?: User | null
 }
@@ -455,29 +458,32 @@ export const versions = {
     return (await res.json()) as DocVersion[]
   },
 
-  // `update` is a base64-encoded Y.encodeStateAsUpdate(ydoc).
-  create: async (docId: string, update: string, label?: string): Promise<DocVersion> => {
+  // The server reads the live relay doc and records a manual version (delta or
+  // keyframe). No blob is sent from the browser.
+  create: async (docId: string, label?: string): Promise<{ seq: number; is_keyframe: boolean; label: string | null }> => {
     const res = await fetch(`${BASE}/api/docs/${docId}/versions`, {
       method: 'POST',
       headers: await authHeaders(true),
-      body: JSON.stringify({ update, label }),
+      body: JSON.stringify({ label }),
     })
     if (!res.ok) {
       const msg = await res.json().then((b) => b.error).catch(() => null)
       throw new ApiError(res.status, msg || `Could not save version (${res.status})`)
     }
-    return (await res.json()) as DocVersion
+    return res.json()
   },
 
-  // Returns the base64 Yjs update for preview/restore.
-  get: async (docId: string, versionId: string): Promise<{ id: string; label: string | null; created_at: string; update: string }> => {
-    const res = await fetch(`${BASE}/api/docs/${docId}/versions/${versionId}`, { headers: await authHeaders() })
+  // The restore chain for a version: an ordered list of base64 Yjs updates —
+  // the nearest keyframe then deltas up to the target — to replay onto a fresh
+  // doc. `chain[0]` is the keyframe (full), the rest are deltas.
+  chain: async (docId: string, seq: number): Promise<{ target: number; from_keyframe: number; chain: string[] }> => {
+    const res = await fetch(`${BASE}/api/docs/${docId}/versions/${seq}/chain`, { headers: await authHeaders() })
     if (!res.ok) throw new ApiError(res.status, `Could not load version (${res.status})`)
     return res.json()
   },
 
-  remove: async (docId: string, versionId: string): Promise<void> => {
-    const res = await fetch(`${BASE}/api/docs/${docId}/versions/${versionId}`, {
+  remove: async (docId: string, seq: number): Promise<void> => {
+    const res = await fetch(`${BASE}/api/docs/${docId}/versions/${seq}`, {
       method: 'DELETE',
       headers: await authHeaders(),
     })

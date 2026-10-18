@@ -159,32 +159,27 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
 
   const currentFolder = folders.find((f) => f.id === currentFolderId)
 
-  // --- Versioning: capture/apply the live Yjs state as a base64 update. ---
-  function snapshotUpdate(): string | null {
-    if (!conn) return null
-    const bytes = Y.encodeStateAsUpdate(conn.ydoc)
-    let bin = ''
-    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
-    return btoa(bin)
-  }
-  function applyUpdate(base64: string) {
-    if (!conn) return
-    const bin = atob(base64)
-    const bytes = new Uint8Array(bin.length)
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  // --- Versioning: restore by replaying a keyframe+delta chain. ---
+  function applyChain(chain: string[]) {
+    if (!conn || chain.length === 0) return
+    // Replay the chain (keyframe first, then deltas) onto a fresh doc to
+    // reconstruct the target version.
+    const snap = new Y.Doc()
+    snap.transact(() => {
+      for (const b64 of chain) {
+        const bin = atob(b64)
+        const bytes = new Uint8Array(bin.length)
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+        Y.applyUpdate(snap, bytes)
+      }
+    })
 
     // A Yjs doc is a CRDT: Y.applyUpdate only ADDS state, it can't remove text
     // written after the snapshot — so a naive apply does not truly revert.
-    // Proper restore = replace the shared XML fragment's content wholesale.
-    // Load the snapshot into a temp doc, then in ONE transaction on the live
-    // doc delete every child of the "default" fragment (TipTap's field) and
-    // insert deep clones of the snapshot's children. The delete+insert is a
-    // real Yjs edit, so it syncs to every client and the editor re-renders.
-    const snap = new Y.Doc()
-    Y.applyUpdate(snap, bytes)
+    // Proper restore = replace the shared XML fragment's content wholesale, in
+    // ONE transaction on the live doc, so it syncs to every client.
     const src = snap.getXmlFragment('default')
     const dst = conn.ydoc.getXmlFragment('default')
-
     conn.ydoc.transact(() => {
       if (dst.length > 0) dst.delete(0, dst.length)
       const clones = src.toArray().map(cloneXml)
@@ -670,8 +665,7 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
           <VersionPanel
             docId={docId}
             canEdit={canEdit}
-            snapshot={snapshotUpdate}
-            applyUpdate={applyUpdate}
+            applyChain={applyChain}
             onClose={() => setShowVersions(false)}
           />
         )}

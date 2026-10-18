@@ -28,6 +28,11 @@ process.env.YPERSISTENCE = process.env.YJS_DB_DIR ?? './y-leveldb'
 // @ts-ignore -- no type declarations for the bin utils
 const { setupWSConnection } = await import('../node_modules/y-websocket/bin/utils.js')
 
+// Import the snapshot timer AFTER YPERSISTENCE is set and utils.js is loaded —
+// snapshots -> ysnap -> utils.js, and a static import would pull utils.js in
+// before the env var above, disabling LevelDB persistence.
+const { startSnapshotTimer } = await import('./snapshots.js')
+
 const server = http.createServer((_req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' })
   res.end('DXEditor collaboration server\n')
@@ -86,4 +91,7 @@ server.on('upgrade', async (req, socket, head) => {
 
 server.listen(PORT, () => {
   console.log(`DXEditor collab (Yjs) listening on ws://localhost:${PORT}`)
+  // Start the server-side delta snapshot timer (shares this process's live docs
+  // map, so it snapshots exactly the rooms the relay holds in memory).
+  startSnapshotTimer()
 })

@@ -54,6 +54,24 @@ function connectDoc(docId: string, userId: string): Promise<DocHandle> {
   })
 }
 
+// Connect to a doc room as the user, wait for sync + a short settle, run `fn`
+// with the live Y.Doc, and always close. Lets callers (e.g. the manual version
+// save) operate on the live state through the relay without duplicating the
+// connect/settle/close dance.
+export async function withLiveDoc<T>(
+  docId: string,
+  userId: string,
+  fn: (doc: Y.Doc) => Promise<T> | T,
+): Promise<T> {
+  const h = await connectDoc(docId, userId)
+  try {
+    await new Promise((r) => setTimeout(r, 400))
+    return await fn(h.ydoc)
+  } finally {
+    h.close()
+  }
+}
+
 // TipTap stores its content in the XML fragment named "default".
 export async function readBodyJSON(docId: string, userId: string): Promise<unknown> {
   const h = await connectDoc(docId, userId)
