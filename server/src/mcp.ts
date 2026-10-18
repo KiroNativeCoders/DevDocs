@@ -1,11 +1,13 @@
 import './env.js'
 import express from 'express'
+import cors from 'cors'
 import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { z } from 'zod'
 import { resolveToken, type TokenScope } from './tokens.js'
+import { verifyOAuthToken, supabaseOAuthMetadataUrl } from './oauth.js'
 import { readBodyJSON, replaceBody } from './docbody.js'
 import { docToMarkdown, markdownToDoc } from './markdown.js'
 
@@ -66,6 +68,48 @@ function buildServer(userId: string, scope: TokenScope) {
       return { content: [{ type: 'text', text: `# ${doc.title}\n\n${md}` }] }
     })
 
+  server.tool('search_documents', 'Search your documents by title. Returns matching docs (id, title, status).',
+    { query: z.string().describe('Case-insensitive text to match in the title') },
+    async ({ query }) => {
+      const { data, error } = await admin
+        .from('document')
+        .select('id,title,status,owner_id')
+        .ilike('title', `%${query}%`)
+        .order('updated_at', { ascending: false })
+        .limit(50)
+      if (error) throw new Error(error.message)
+      const { data: mems } = await admin.from('membership').select('document_id').eq('user_id', userId)
+      const shared = new Set((mems ?? []).map((m) => m.document_id))
+      const hits = (data ?? []).filter((d) => d.owner_id === userId || shared.has(d.id)).map(({ owner_id: _o, ...r }) => r)
+      return { content: [{ type: 'text', text: JSON.stringify(hits, null, 2) }] }
+    })
+
+  server.tool('list_comments', 'List the comment threads on a document.',
+    { id: z.string().describe('Document id') },
+    async ({ id }) => {
+      await assertAccess(userId, id, false)
+      const { data, error } = await admin
+        .from('comment')
+        .select('id,body,quote,parent_id,resolved,created_at,author:app_user(name,email)')
+        .eq('document_id', id)
+        .order('created_at', { ascending: true })
+      if (error) throw new Error(error.message)
+      return { content: [{ type: 'text', text: JSON.stringify(data ?? [], null, 2) }] }
+    })
+
+  server.tool('list_versions', 'List a document\'s saved versions (metadata only).',
+    { id: z.string().describe('Document id') },
+    async ({ id }) => {
+      await assertAccess(userId, id, false)
+      const { data, error } = await admin
+        .from('document_version')
+        .select('id,label,created_at')
+        .eq('document_id', id)
+        .order('created_at', { ascending: false })
+      if (error) throw new Error(error.message)
+      return { content: [{ type: 'text', text: JSON.stringify(data ?? [], null, 2) }] }
+    })
+
   if (canWrite) {
     server.tool('create_document', 'Create a new document from Markdown. Returns its id.',
       { title: z.string().describe('Document title'), markdown: z.string().optional().describe('Body as Markdown') },
@@ -103,23 +147,83 @@ function buildServer(userId: string, scope: TokenScope) {
         if (error) throw new Error(error.message)
         return { content: [{ type: 'text', text: `Deleted document ${id}` }] }
       })
+
+    server.tool('add_comment', 'Add a comment (or a reply) to a document.',
+      { id: z.string().describe('Document id'), body: z.string().describe('Comment text'), parent_id: z.string().optional().describe('Reply to this comment id') },
+      async ({ id, body, parent_id }) => {
+        await assertAccess(userId, id, true)
+        const { error } = await admin.from('comment').insert({
+          document_id: id, author_id: userId, body, parent_id: parent_id ?? null,
+        })
+        if (error) throw new Error(error.message)
+        return { content: [{ type: 'text', text: `Comment added to ${id}` }] }
+      })
+
+    server.tool('set_status', 'Set a document\'s review status.',
+      { id: z.string(), status: z.enum(['DRAFT', 'IN_REVIEW', 'ACCEPTED', 'REJECTED', 'SUPERSEDED']) },
+      async ({ id, status }) => {
+        await assertAccess(userId, id, true)
+        const { error } = await admin.from('document').update({ status }).eq('id', id)
+        if (error) throw new Error(error.message)
+        return { content: [{ type: 'text', text: `Status of ${id} set to ${status}` }] }
+      })
   }
 
   return server
 }
 
 const app = express()
+// Browser-based MCP clients (Inspector, ChatGPT/Claude web connectors) call
+// /mcp cross-origin, so CORS is required or the browser blocks with "Failed to
+// fetch". This is a public API keyed by bearer token, so any origin is allowed;
+// expose the MCP session header and allow the headers clients send.
+app.use(
+  cors({
+    origin: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'mcp-session-id', 'mcp-protocol-version'],
+    exposedHeaders: ['mcp-session-id', 'WWW-Authenticate'],
+    maxAge: 86400,
+  }),
+)
 app.use(express.json({ limit: '4mb' }))
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'devdocs-mcp' }))
+
+// --- OAuth: Supabase Auth is the authorization server. We are only a resource
+// server. Advertise where clients should authenticate (RFC 9728 protected-
+// resource metadata) by pointing at Supabase's OAuth discovery document. ---
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  // Behind nginx the internal hop is http; trust X-Forwarded-Proto so the
+  // advertised resource identifier is the public https URL (clients require it).
+  const proto = (req.get('x-forwarded-proto') || req.protocol).split(',')[0].trim()
+  const self = `${proto}://${req.get('host')}`
+  res.json({
+    resource: `${self}/mcp`,
+    authorization_servers: [supabaseOAuthMetadataUrl()],
+    // Supabase OAuth accepts OIDC scopes, NOT custom read/write (requesting
+    // read/write fails with "unsupported scope"). Authorization is enforced
+    // server-side per user regardless of scope.
+    scopes_supported: ['openid', 'email', 'profile'],
+    resource_name: 'DevDocs',
+  })
+})
+
+// Resolve a bearer token to { userId, scope }, accepting EITHER a personal
+// ddx_ API token OR a Supabase-issued OAuth access token (a JWT).
+async function resolveBearer(raw: string): Promise<{ userId: string; scope: TokenScope } | null> {
+  if (!raw) return null
+  if (raw.startsWith('ddx_')) return resolveToken(raw)
+  return verifyOAuthToken(raw) // Supabase OAuth JWT
+}
 
 // Streamable HTTP: one request-scoped transport+server per call (stateless).
 app.post('/mcp', async (req, res) => {
   const auth = req.headers.authorization
   const raw = auth?.startsWith('Bearer ') ? auth.slice(7).trim() : ''
-  const resolved = await resolveToken(raw)
+  const resolved = await resolveBearer(raw)
   if (!resolved) {
-    res.status(401).json({ jsonrpc: '2.0', error: { code: -32001, message: 'Invalid or missing API token' }, id: null })
+    res.status(401).json({ jsonrpc: '2.0', error: { code: -32001, message: 'Invalid or missing token' }, id: null })
     return
   }
   try {

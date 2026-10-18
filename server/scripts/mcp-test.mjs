@@ -66,11 +66,11 @@ async function main() {
 
     const list = await mcp(tokA.raw, 'tools/list', {})
     const names = (list.json?.result?.tools ?? []).map((t) => t.name)
-    ok(names.includes('create_document') && names.length === 5, `read_write sees 5 tools (${names.length})`)
+    ok(names.includes('create_document') && names.includes('add_comment') && names.length === 10, `read_write sees 10 tools (${names.length})`)
 
     const listRO = await mcp(tokRO.raw, 'tools/list', {})
     const roNames = (listRO.json?.result?.tools ?? []).map((t) => t.name)
-    ok(roNames.length === 2 && !roNames.includes('delete_document'), `read_only sees only 2 read tools (${roNames.length})`)
+    ok(roNames.length === 5 && !roNames.includes('delete_document'), `read_only sees only 5 read tools (${roNames.length})`)
 
     // --- create ---
     const cr = await callTool(tokA.raw, 'create_document', { title: '__mcp_test', markdown: '# Hello\n\nFrom **MCP**.\n\n- one\n- two' })
@@ -107,6 +107,16 @@ async function main() {
     const gGone = await callTool(tokA.raw, 'get_document', { id: docId })
     ok(/not found|no access/i.test(JSON.stringify(gGone.json)), 'deleted doc no longer gettable')
     if (docId) created.pop()
+
+    // --- OAuth: we are a resource server; Supabase is the auth server. Verify
+    // the MCP server advertises Supabase via protected-resource metadata. ---
+    const base = MCP.replace(/\/mcp$/, '')
+    const prm = await fetch(`${base}/.well-known/oauth-protected-resource`).then((r) => r.json()).catch(() => null)
+    ok(!!prm && Array.isArray(prm.authorization_servers) && prm.authorization_servers[0]?.includes('supabase'),
+      'OAuth: advertises Supabase as the authorization server')
+    const badJwt = await callTool('eyJhbGciOiJIUzI1NiJ9.bogus.sig', 'list_documents')
+    ok(/invalid|missing token|-32001/i.test(JSON.stringify(badJwt.json)) || badJwt.status === 401,
+      'OAuth: a bogus JWT is rejected')
   } finally {
     // cleanup
     for (const id of created) await rest(`document?id=eq.${id}`, { method: 'DELETE' })

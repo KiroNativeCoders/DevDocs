@@ -5,6 +5,7 @@ import Home from './components/Home'
 import Auth from './components/Auth'
 import ShareDialog from './components/ShareDialog'
 import ConnectAiModal from './components/ConnectAiModal'
+import ConsentScreen from './components/ConsentScreen'
 import { auth, docs, type User, type DocDetail } from './lib/api'
 import { pushRecent } from './lib/recent'
 import './App.css'
@@ -103,6 +104,10 @@ export default function App() {
       : detail?.role === 'EDITOR'
         ? 'Shared · can edit'
         : 'Shared · view only'
+
+  // OAuth consent screen (Supabase OAuth server redirects here). It manages its
+  // own auth, so it sits BEFORE the normal auth gate.
+  if (window.location.pathname === '/oauth/consent') return <ConsentScreen />
 
   if (!authChecked) return <div className="app-boot">Loading…</div>
   if (!user) return <Auth onAuthed={setUser} />
