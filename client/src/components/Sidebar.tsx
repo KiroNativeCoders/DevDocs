@@ -231,7 +231,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
             }}
             title="Create new folder"
           >
-            📁+ Folder
+            + Folder
           </button>
           <button
             type="button"
