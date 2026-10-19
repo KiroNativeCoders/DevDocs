@@ -49,6 +49,7 @@
 .doc-folder-chip-container {
   position: relative;
   flex-shrink: 0;
+  display: none; /* folder chip hidden from the top bar per request */
 }
 
 .doc-folder-chip {
