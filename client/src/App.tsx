@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import Editor from './components/Editor'
 import Home from './components/Home'
@@ -34,6 +34,10 @@ export default function App() {
   const [detail, setDetail] = useState<DocDetail | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [sharing, setSharing] = useState(false)
+  const [navHover, setNavHover] = useState(false)
+  const [navPinned, setNavPinned] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
   const [connectOpen, setConnectOpen] = useState(false)
 
   // Navigate: push a new URL and update selection. Passing null goes home (/).
@@ -58,6 +62,21 @@ export default function App() {
       .catch(() => setUser(null))
       .finally(() => setAuthChecked(true))
   }, [])
+
+  // Close the user dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setUserMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [userMenuOpen])
 
   // Load the selected doc's detail (title + role) when selection changes.
   useEffect(() => {
@@ -119,11 +138,6 @@ export default function App() {
           <span className="brand-mark">DD</span>
           <span className="brand-name">DevDocs</span>
         </div>
-        {canShare && (
-          <button className="header-btn share-primary" onClick={() => setSharing(true)}>
-            Share
-          </button>
-        )}
         {detail && detail.role !== 'OWNER' && (
           <span className="role-badge">{roleLabel}</span>
         )}
@@ -137,17 +151,56 @@ export default function App() {
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
-          <span className="user-email">{user.name || user.email}</span>
-          <button className="header-btn" onClick={() => setConnectOpen(true)} title="Connect an AI agent via MCP">Connect AI</button>
-          <button className="header-btn ghost" onClick={logout}>Log out</button>
+          <div className="user-menu" ref={userMenuRef}>
+            <button
+              type="button"
+              className="user-menu-trigger"
+              onClick={() => setUserMenuOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={userMenuOpen}
+            >
+              <span className="user-email">{user.name || user.email}</span>
+              <span className="user-menu-caret" aria-hidden="true">▾</span>
+            </button>
+            {userMenuOpen && (
+              <div className="user-menu-dropdown" role="menu">
+                <div className="user-menu-email" title={user.email}>{user.email}</div>
+                <button
+                  className="user-menu-item"
+                  role="menuitem"
+                  onClick={() => { setConnectOpen(true); setUserMenuOpen(false) }}
+                >
+                  MCP Tokens
+                </button>
+                <button
+                  className="user-menu-item user-menu-item-danger"
+                  role="menuitem"
+                  onClick={() => { setUserMenuOpen(false); logout() }}
+                >
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
+          {canShare && (
+            <button className="header-btn share-primary" onClick={() => setSharing(true)}>
+              Share
+            </button>
+          )}
         </div>
       </header>
       <div className="app-body">
-        <Sidebar
-          selectedId={selectedId}
-          onSelect={(id) => navigate(id || null)}
-          refreshKey={refreshKey}
-        />
+        <div
+          className={`sidebar-dock${navPinned || navHover ? ' open' : ''}`}
+          onMouseEnter={() => setNavHover(true)}
+          onMouseLeave={() => setNavHover(false)}
+        >
+          <Sidebar
+            selectedId={selectedId}
+            onSelect={(id) => navigate(id || null)}
+            refreshKey={refreshKey}
+          />
+        </div>
         <main className="app-main">
           {selectedId && detail ? (
             <Editor
@@ -158,6 +211,9 @@ export default function App() {
               role={detail.role}
               currentUserId={user.id}
               onTitleSaved={() => setRefreshKey((k) => k + 1)}
+              navOpen={navPinned}
+              onRevealNav={() => setNavHover(true)}
+              onToggleNav={() => setNavPinned((p) => !p)}
             />
           ) : (
             <Home
