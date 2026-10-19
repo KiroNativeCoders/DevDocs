@@ -9,6 +9,7 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { TableCell } from '@tiptap/extension-table-cell'
+import { TextStyleKit } from '@tiptap/extension-text-style'
 import Image from '@tiptap/extension-image'
 import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
@@ -71,6 +72,23 @@ export const FONT_OPTIONS: { key: FontKey; label: string }[] = [
   { key: 'casual', label: 'Casual Hand' },
 ]
 
+// FontKey -> concrete CSS font-family stack, mirroring the .font-* rules in
+// Editor.css. Used to set the per-selection FontFamily mark to a real value.
+export const FONT_STACKS: Record<FontKey, string> = {
+  sans: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  inter: "'Inter', system-ui, -apple-system, sans-serif",
+  jakarta: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif",
+  serif: "Georgia, Cambria, 'Times New Roman', serif",
+  merriweather: "'Merriweather', Georgia, serif",
+  playfair: "'Playfair Display', Georgia, serif",
+  mono: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+  fira: "'Fira Code', ui-monospace, monospace",
+  casual: "'Comic Sans MS', cursive, sans-serif",
+}
+
+// Font-size options for the per-selection size picker (px).
+export const FONT_SIZES = ['12', '14', '16', '18', '20', '24', '28', '32'] as const
+
 type Props = {
   docId: string
   initialTitle: string
@@ -78,9 +96,12 @@ type Props = {
   role: Role
   currentUserId: string
   onTitleSaved: () => void
+  navOpen?: boolean
+  onRevealNav?: () => void
+  onToggleNav?: () => void
 }
 
-export default function Editor({ docId, initialTitle, initialStatus, role, currentUserId, onTitleSaved }: Props) {
+export default function Editor({ docId, initialTitle, initialStatus, role, currentUserId, onTitleSaved, navOpen, onRevealNav, onToggleNav }: Props) {
   const identity = useMemo(makeIdentity, [])
   const [conn, setConn] = useState<{ ydoc: Y.Doc; provider: WebsocketProvider } | null>(null)
   const [status, setStatus] = useState<Status>('connecting')
@@ -623,6 +644,9 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
             onChangeFont={changeFont}
             focusAnchor={focusAnchor}
             onEditorReady={setEd}
+            navOpen={navOpen}
+            onRevealNav={onRevealNav}
+            onToggleNav={onToggleNav}
             onThreadCreated={() => {
               setCommentRefresh((k) => k + 1)
               openComments()
@@ -692,6 +716,9 @@ function CollabEditor({
   focusAnchor,
   onThreadCreated,
   onEditorReady,
+  navOpen,
+  onRevealNav,
+  onToggleNav,
 }: {
   docId: string
   ydoc: Y.Doc
@@ -704,6 +731,9 @@ function CollabEditor({
   onThreadCreated: () => void
   onOpenCommentsAt?: (commentId: string) => void
   onEditorReady?: (editor: TiptapEditor | null) => void
+  navOpen?: boolean
+  onRevealNav?: () => void
+  onToggleNav?: () => void
 }) {
   // A floating "Comment" button shown over the current text selection.
   const [bubble, setBubble] = useState<{ top: number; left: number } | null>(null)
@@ -733,6 +763,7 @@ function CollabEditor({
       TableRow,
       TableHeader,
       TableCell,
+      TextStyleKit,
       CommentMark,
       MermaidNode,
       CodeRef,
@@ -755,6 +786,27 @@ function CollabEditor({
       setBubble({ top: start.top - 42, left: (start.left + end.left) / 2 })
     },
     editorProps: {
+      // Clicking commented text opens its thread popover. handleClick gets the
+      // exact click position; marks live on TEXT nodes, so resolve them from
+      // the position (handleClickOn only sees ancestor blocks, which carry no
+      // marks). Also read the clicked DOM span as a direct fallback.
+      handleClick(view, pos, event) {
+        const target = event.target as HTMLElement | null
+        const el = target?.closest?.('[data-comment-id]') as HTMLElement | null
+        let commentId = el?.getAttribute('data-comment-id') ?? undefined
+        if (!commentId) {
+          const $pos = view.state.doc.resolve(pos)
+          const marks = [
+            ...(view.state.doc.nodeAt(pos)?.marks ?? []),
+            ...($pos.nodeBefore?.marks ?? []),
+          ]
+          commentId = marks.find((m) => m.type.name === 'comment')?.attrs?.commentId as string | undefined
+        }
+        if (!commentId || !openThreadRef.current) return false
+        const rect = (el ?? target ?? view.dom).getBoundingClientRect()
+        openThreadRef.current(commentId, rect)
+        return false // let the cursor place normally
+      },
       // Paste an image (e.g. a screenshot) → upload to storage, insert the URL.
       handlePaste(_view, event) {
         if (!editable) return false
@@ -837,8 +889,9 @@ function CollabEditor({
   // Lightbox: double-clicking an image expands it (single click selects the
   // node via ProseMirror's default behavior).
   const [lightbox, setLightbox] = useState<string | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const scroll = document.querySelector('.editor-scroll')
+    const scroll = scrollRef.current
     if (!scroll) return
     const onDblClick = (e: Event) => {
       const t = e.target as HTMLElement
@@ -849,7 +902,7 @@ function CollabEditor({
     }
     scroll.addEventListener('dblclick', onDblClick)
     return () => scroll.removeEventListener('dblclick', onDblClick)
-  }, [])
+  }, [editor])
 
   // Mermaid diagram enlarge: the NodeView dispatches { svg, source } or raw svg string
   const [mermaidModalData, setMermaidModalData] = useState<{ svg: string; source?: string } | null>(null)
@@ -890,6 +943,9 @@ function CollabEditor({
   const [popReply, setPopReply] = useState('')
   // Shared guard so a comment or reply can't be inserted twice by a double-fire.
   const submittingRef = useRef(false)
+  // Holds the current "open thread popover for this commentId" fn so the
+  // editor's handleClickOn (defined earlier) can call it without a stale closure.
+  const openThreadRef = useRef<((commentId: string, rect: DOMRect) => void) | null>(null)
 
   const loadPopoverThread = useCallback(
     async (commentId: string) => {
@@ -905,27 +961,18 @@ function CollabEditor({
   )
 
   useEffect(() => {
-    const scroll = document.querySelector('.editor-scroll')
-    if (!scroll) return
-    const onClick = async (e: Event) => {
-      const target = e.target as HTMLElement
-      const mark = target.closest<HTMLElement>('[data-comment-id]')
-      if (!mark) return
-      const commentId = mark.getAttribute('data-comment-id')!
-      // Clicking commented text opens the floating thread popup anchored to the
-      // mark (the same white-box UI as the new-comment composer), not the side
-      // panel. Close any open new-comment composer first.
+    // Keep the ref pointing at the current open-thread logic; TipTap's
+    // handleClickOn calls it. This replaces the old DOM click listener, which
+    // was fragile about which .editor-scroll it bound to and when.
+    openThreadRef.current = (commentId: string, rect: DOMRect) => {
       setComposer(null)
-      // Position like the new-comment composer: the popover is absolutely
-      // positioned against a viewport-origin ancestor, so use raw viewport
-      // coords (same convention as coordsAtPos used for the bubble/composer).
-      const rect = mark.getBoundingClientRect()
       setPopReply('')
-      setPopover({ top: rect.bottom + 8, left: rect.left, commentId, thread: null })
+      setPopover({ top: rect.bottom + 2, left: rect.left, commentId, thread: null })
       loadPopoverThread(commentId)
     }
-    scroll.addEventListener('click', onClick)
-    return () => scroll.removeEventListener('click', onClick)
+    return () => {
+      openThreadRef.current = null
+    }
   }, [docId, loadPopoverThread])
 
   // Add a reply to the thread shown in the popover. Reopens it if resolved so
@@ -1204,7 +1251,7 @@ function CollabEditor({
   )
 
   return (
-    <div className="editor-scroll">
+    <div className="editor-scroll" ref={scrollRef}>
       {bubble && editable && !aiPopover && (
         <div
           className="ai-floating-bubble-bar"
@@ -1378,6 +1425,9 @@ function CollabEditor({
           font={font}
           onChangeFont={onChangeFont}
           onOpenAi={triggerAiFromToolbar}
+          navOpen={navOpen}
+          onRevealNav={onRevealNav}
+          onToggleNav={onToggleNav}
         />
       )}
       <EditorContent editor={editor} className={`editor-content font-${font}`} />

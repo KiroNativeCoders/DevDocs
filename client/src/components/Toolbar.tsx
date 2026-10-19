@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/react'
 import Select from './Select'
-import { type FontKey, FONT_OPTIONS } from './Editor'
+import { type FontKey, FONT_OPTIONS, FONT_STACKS, FONT_SIZES } from './Editor'
 import GeminiSparkleIcon from './GeminiSparkleIcon'
 import './Toolbar.css'
 
@@ -9,6 +9,9 @@ type Props = {
   font?: FontKey
   onChangeFont?: (font: FontKey) => void
   onOpenAi?: () => void
+  navOpen?: boolean
+  onRevealNav?: () => void
+  onToggleNav?: () => void
 }
 
 function Btn({
@@ -51,9 +54,10 @@ const BLOCK_LABELS: Record<BlockType, string> = {
 
 export default function Toolbar({
   editor,
-  font,
-  onChangeFont,
   onOpenAi,
+  navOpen,
+  onRevealNav,
+  onToggleNav,
 }: Props) {
   if (!editor) return null
 
@@ -66,6 +70,14 @@ export default function Toolbar({
         ? 'h3'
         : 'paragraph'
 
+  // Reflect the selection's current font-family mark as a FontKey (default sans).
+  const activeFamily = (editor.getAttributes('textStyle').fontFamily as string | undefined) ?? ''
+  const activeFontKey: FontKey =
+    (Object.keys(FONT_STACKS) as FontKey[]).find((k) => FONT_STACKS[k] === activeFamily) ?? 'sans'
+  // Reflect the selection's current font-size mark (strip 'px'), default 16.
+  const activeSizeRaw = (editor.getAttributes('textStyle').fontSize as string | undefined) ?? ''
+  const activeFontSize: string = activeSizeRaw.replace('px', '') || '16'
+
   function setBlock(type: BlockType) {
     const chain = editor!.chain().focus()
     if (type === 'paragraph') chain.setParagraph().run()
@@ -74,6 +86,25 @@ export default function Toolbar({
 
   return (
     <div className="toolbar" role="toolbar" aria-label="Formatting">
+      {onToggleNav && (
+        <>
+          <button
+            type="button"
+            className={`tb-btn tb-nav-reveal${navOpen ? ' is-active' : ''}`}
+            title={navOpen ? 'Hide sidebar' : 'Show sidebar'}
+            aria-label="Toggle sidebar"
+            onMouseEnter={onRevealNav}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onToggleNav}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+          <span className="tb-sep" />
+        </>
+      )}
       {/* Undo / redo */}
       <div className="tb-group">
         <Btn title="Undo (⌘Z)" label="↺" canRun={editor.can().undo()}
@@ -97,20 +128,28 @@ export default function Toolbar({
         ariaLabel="Paragraph style"
       />
 
-      {/* Font dropdown */}
-      {font && onChangeFont && (
-        <Select<FontKey>
-          className="tb-font-select-wrapper"
-          value={font}
-          onChange={onChangeFont}
-          options={FONT_OPTIONS.map((f) => ({
-            value: f.key,
-            label: f.label,
-          }))}
-          size="sm"
-          ariaLabel="Font family"
-        />
-      )}
+      {/* Font dropdown — sets the FontFamily mark on the current selection */}
+      <Select<FontKey>
+        className="tb-font-select-wrapper"
+        value={activeFontKey}
+        onChange={(key) => editor.chain().focus().setFontFamily(FONT_STACKS[key]).run()}
+        options={FONT_OPTIONS.map((f) => ({
+          value: f.key,
+          label: f.label,
+        }))}
+        size="sm"
+        ariaLabel="Font family (applies to selected text)"
+      />
+
+      {/* Font-size picker — sets the FontSize mark on the current selection */}
+      <Select<string>
+        className="tb-size-select-wrapper"
+        value={activeFontSize}
+        onChange={(px) => editor.chain().focus().setFontSize(`${px}px`).run()}
+        options={FONT_SIZES.map((s) => ({ value: s, label: s }))}
+        size="sm"
+        ariaLabel="Font size (applies to selected text)"
+      />
 
       <span className="tb-sep" />
 
