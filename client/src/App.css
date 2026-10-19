@@ -50,6 +50,106 @@
 
 .app-main { flex: 1; min-width: 0; }
 
+/* Collapsible sidebar: hidden by default, revealed on hover of the header
+   search icon or the dock itself (or pinned by clicking the icon). Overlays
+   the content so the editor doesn't reflow as it opens/closes. */
+.sidebar-dock {
+  position: relative;
+  width: 0;
+  flex-shrink: 0;
+  transition: width 0.18s ease;
+  z-index: 20;
+}
+.sidebar-dock > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 260px;
+  transform: translateX(-100%);
+  transition: transform 0.18s ease;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
+  background: #fff;
+}
+.sidebar-dock.open > * {
+  transform: translateX(0);
+}
+
+.sidebar-reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e6e6e3;
+  background: #fff;
+  border-radius: 7px;
+  color: #4b5563;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.sidebar-reveal:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #1f2937;
+}
+
+/* User dropdown (email trigger -> Connect AI / Log out) */
+.user-menu { position: relative; }
+.user-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #e6e6e3;
+  background: #fff;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: #1f2937;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.user-menu-trigger:hover { background: #f3f4f6; border-color: #d1d5db; }
+.user-menu-caret { font-size: 10px; color: #8a8f96; }
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: #fff;
+  border: 1px solid #e6e6e3;
+  border-radius: 9px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  padding: 6px;
+  z-index: 40;
+}
+.user-menu-email {
+  font-size: 12px;
+  color: #8a8f96;
+  padding: 6px 8px 8px;
+  border-bottom: 1px solid #f0efec;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  padding: 8px 8px;
+  font-size: 13px;
+  color: #1f2937;
+  cursor: pointer;
+}
+.user-menu-item:hover { background: #f3f4f6; }
+.user-menu-item-danger { color: #b91c1c; }
+.user-menu-item-danger:hover { background: #fef2f2; }
+
 .header-btn {
   border: 1px solid #e6e6e3;
   background: #fff;
