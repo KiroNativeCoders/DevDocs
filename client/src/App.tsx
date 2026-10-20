@@ -7,6 +7,8 @@ import ShareDialog from './components/ShareDialog'
 import ConnectAiModal from './components/ConnectAiModal'
 import ConsentScreen from './components/ConsentScreen'
 import LaunchPage from './components/LaunchPage'
+import AnalyticsModal from './components/AnalyticsModal'
+import { recordVisit } from './lib/analytics'
 import { auth, docs, type User, type DocDetail } from './lib/api'
 import { pushRecent } from './lib/recent'
 import { syncFoldersFromRemote } from './lib/folders'
@@ -42,6 +44,7 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [sharing, setSharing] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
+  const [analyticsOpen, setAnalyticsOpen] = useState(false)
   // Allow viewing standalone launching page at /launch or /landing without needing login
   const [isLaunch, setIsLaunch] = useState(isLaunchPath())
 
@@ -50,6 +53,11 @@ export default function App() {
     window.addEventListener('popstate', checkPath)
     return () => window.removeEventListener('popstate', checkPath)
   }, [])
+
+  // Track page visits and daily visitors into Supabase
+  useEffect(() => {
+    void recordVisit(user?.id)
+  }, [selectedId, isLaunch, user?.id])
 
   // Navigate: push a new URL and update selection. Passing null goes home (/).
   const navigate = useCallback((id: string | null) => {
@@ -164,6 +172,7 @@ export default function App() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           <span className="user-email">{user.name || user.email}</span>
+          <button className="header-btn" onClick={() => setAnalyticsOpen(true)} title="View site traffic and daily visitors">📊 Traffic</button>
           <button className="header-btn" onClick={() => setConnectOpen(true)} title="Connect an AI agent via MCP">Connect AI</button>
           <button className="header-btn ghost" onClick={logout}>Log out</button>
         </div>
@@ -199,6 +208,7 @@ export default function App() {
         <ShareDialog docId={selectedId} isOwner={detail.role === 'OWNER'} onClose={() => setSharing(false)} />
       )}
       <ConnectAiModal isOpen={connectOpen} onClose={() => setConnectOpen(false)} />
+      <AnalyticsModal isOpen={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
     </div>
   )
 }
