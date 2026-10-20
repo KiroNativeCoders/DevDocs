@@ -55,6 +55,24 @@ function block(n: PMNode): string {
     case 'mermaid':
       // The flagship round-trip: fenced ```mermaid carrying the diagram source.
       return '```mermaid\n' + ((n.attrs?.source as string) || '').trim() + '\n```'
+    case 'htmlPage': {
+      const a = n.attrs ?? {}
+      const html = ((a.html as string) || '').trim()
+      const title = (a.title as string) || ''
+      const src = (a.src as string) || ''
+      const height = (a.height as number) || 400
+      const size = (a.size as string) || 'full'
+      const meta = `<!-- devdocs:htmlPage title="${title.replace(/"/g, '&quot;')}" src="${src}" height="${height}" size="${size}" -->`
+      return '```html\n' + meta + (html ? '\n' + html : '') + '\n```'
+    }
+    case 'excalidraw': {
+      const a = n.attrs ?? {}
+      const url = (a.url as string) || ''
+      const title = (a.title as string) || 'Excalidraw Drawing'
+      const height = (a.height as number) || 520
+      const size = (a.size as string) || 'large'
+      return `<!-- devdocs:excalidraw url="${url}" title="${title.replace(/"/g, '&quot;')}" height="${height}" size="${size}" -->\n[${title}](${url})`
+    }
     case 'codeRef': {
       // Degrade to a permalink line + the pinned snippet as a fenced block, so
       // it reads correctly in a plain Git repo even without the custom node.
@@ -177,8 +195,59 @@ export function markdownToDoc(md: string): PMNode {
       i++
       while (i < lines.length && !/^```\s*$/.test(lines[i])) body.push(lines[i++])
       i++ // closing fence
-      if (lang === 'mermaid') content.push({ type: 'mermaid', attrs: { source: body.join('\n') } })
-      else content.push({ type: 'codeBlock', attrs: { language: lang || null }, content: [{ type: 'text', text: body.join('\n') }] })
+      if (lang === 'mermaid') {
+        content.push({ type: 'mermaid', attrs: { source: body.join('\n') } })
+      } else if (lang === 'html' && body[0]?.startsWith('<!-- devdocs:htmlPage')) {
+        const metaLine = body[0]
+        const titleMatch = metaLine.match(/title="([^"]*)"/)
+        const srcMatch = metaLine.match(/src="([^"]*)"/)
+        const heightMatch = metaLine.match(/height="([^"]*)"/)
+        const sizeMatch = metaLine.match(/size="([^"]*)"/)
+        const htmlCode = body.slice(1).join('\n').trim()
+        content.push({
+          type: 'htmlPage',
+          attrs: {
+            html: htmlCode,
+            title: titleMatch ? titleMatch[1] : 'HTML Page',
+            src: srcMatch ? srcMatch[1] : '',
+            height: heightMatch ? Number(heightMatch[1]) : 400,
+            size: sizeMatch ? sizeMatch[1] : 'full',
+          },
+        })
+      } else {
+        content.push({ type: 'codeBlock', attrs: { language: lang || null }, content: [{ type: 'text', text: body.join('\n') }] })
+      }
+      continue
+    }
+
+    // Excalidraw block
+    const excalMeta = line.match(/^<!-- devdocs:excalidraw url="([^"]*)"(?: title="([^"]*)")?(?: height="([^"]*)")?(?: size="([^"]*)")? -->/)
+    if (excalMeta) {
+      flushPara(para)
+      const url = excalMeta[1]
+      const title = excalMeta[2] || 'Excalidraw Drawing'
+      const height = excalMeta[3] ? Number(excalMeta[3]) : 520
+      const size = excalMeta[4] || 'large'
+      content.push({ type: 'excalidraw', attrs: { url, title, height, size } })
+      i++
+      if (i < lines.length && lines[i].startsWith('[')) i++
+      continue
+    }
+
+    // Standalone Excalidraw link line
+    const excalLink = line.match(/^\[([^\]]*)\]\((https?:\/\/(?:www\.)?(?:link\.)?excalidraw\.com\/[^\)]+)\)\s*$/)
+    if (excalLink) {
+      flushPara(para)
+      content.push({
+        type: 'excalidraw',
+        attrs: {
+          title: excalLink[1] || 'Excalidraw Drawing',
+          url: excalLink[2],
+          height: 520,
+          size: 'large',
+        },
+      })
+      i++
       continue
     }
 

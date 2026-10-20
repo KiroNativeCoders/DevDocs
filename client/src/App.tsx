@@ -6,9 +6,16 @@ import Auth from './components/Auth'
 import ShareDialog from './components/ShareDialog'
 import ConnectAiModal from './components/ConnectAiModal'
 import ConsentScreen from './components/ConsentScreen'
+import LaunchPage from './components/LaunchPage'
 import { auth, docs, type User, type DocDetail } from './lib/api'
 import { pushRecent } from './lib/recent'
+import { syncFoldersFromRemote } from './lib/folders'
 import './App.css'
+
+// Check if current URL is the standalone landing/launching page.
+function isLaunchPath(): boolean {
+  return window.location.pathname === '/launch' || window.location.pathname === '/landing'
+}
 
 // Read the current document id from the URL (/doc/:id), or null for home (/).
 function idFromPath(): string | null {
@@ -35,6 +42,14 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [sharing, setSharing] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
+  // Allow viewing standalone launching page at /launch or /landing without needing login
+  const [isLaunch, setIsLaunch] = useState(isLaunchPath())
+
+  useEffect(() => {
+    const checkPath = () => setIsLaunch(isLaunchPath())
+    window.addEventListener('popstate', checkPath)
+    return () => window.removeEventListener('popstate', checkPath)
+  }, [])
 
   // Navigate: push a new URL and update selection. Passing null goes home (/).
   const navigate = useCallback((id: string | null) => {
@@ -54,7 +69,10 @@ export default function App() {
   useEffect(() => {
     auth
       .current()
-      .then(setUser)
+      .then((u) => {
+        setUser(u)
+        if (u) void syncFoldersFromRemote()
+      })
       .catch(() => setUser(null))
       .finally(() => setAuthChecked(true))
   }, [])
@@ -108,6 +126,14 @@ export default function App() {
   // OAuth consent screen (Supabase OAuth server redirects here). It manages its
   // own auth, so it sits BEFORE the normal auth gate.
   if (window.location.pathname === '/oauth/consent') return <ConsentScreen />
+
+  if (isLaunch) {
+    return <LaunchPage onStartWriting={() => {
+      window.history.pushState({}, '', '/')
+      setIsLaunch(false)
+      setSelectedId(null)
+    }} />
+  }
 
   if (!authChecked) return <div className="app-boot">Loading…</div>
   if (!user) return <Auth onAuthed={setUser} />

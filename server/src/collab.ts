@@ -14,9 +14,6 @@ import { getAccess } from './access.js'
  * with our Yjs import silently failed to store updates, because utils creates
  * docs with its Yjs and our Y.encodeStateAsUpdate operated on a different
  * instance — a no-op. Letting utils own both avoids that mismatch.)
- *
- * We authenticate + authorize on the HTTP upgrade (RLS can't guard the Yjs
- * content layer), then hand the socket to setupWSConnection.
  */
 
 const PORT = Number(process.env.COLLAB_PORT ?? 4001)

@@ -614,3 +614,57 @@ export const images = {
     return supabase.storage.from('doc-images').getPublicUrl(path).data.publicUrl
   },
 }
+
+// ---------------------------------------------------------------- folders
+export const foldersApi = {
+  list: async (): Promise<any[]> => {
+    try {
+      const res = await fetch(`${BASE}/api/folders`, { headers: await authHeaders() })
+      if (!res.ok) return []
+      return await res.json()
+    } catch {
+      return []
+    }
+  },
+  save: async (id: string, name: string, parentId?: string | null): Promise<void> => {
+    try {
+      await fetch(`${BASE}/api/folders`, {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ id, name, parentId }),
+      })
+    } catch {
+      // fallback
+    }
+  },
+  remove: async (id: string): Promise<void> => {
+    try {
+      await fetch(`${BASE}/api/folders/${id}`, {
+        method: 'DELETE',
+        headers: await authHeaders(),
+      })
+    } catch {
+      // fallback
+    }
+  },
+  getMapping: async (): Promise<Record<string, string>> => {
+    try {
+      const res = await fetch(`${BASE}/api/folders/mapping`, { headers: await authHeaders() })
+      if (!res.ok) return {}
+      return await res.json()
+    } catch {
+      return {}
+    }
+  },
+  saveDocFolder: async (docId: string, folderId: string | null): Promise<void> => {
+    try {
+      await fetch(`${BASE}/api/folders/mapping`, {
+        method: 'POST',
+        headers: await authHeaders(true),
+        body: JSON.stringify({ docId, folderId }),
+      })
+    } catch {
+      // fallback
+    }
+  },
+}
