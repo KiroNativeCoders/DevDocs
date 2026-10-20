@@ -3,7 +3,6 @@ import Select from './Select'
 import { type FontKey, FONT_OPTIONS } from './Editor'
 import GeminiSparkleIcon from './GeminiSparkleIcon'
 import './HtmlPage'
-import './Excalidraw'
 import './Toolbar.css'
 
 type Props = {
@@ -153,8 +152,6 @@ export default function Toolbar({
           onClick={() => editor.chain().focus().setHorizontalRule().run()} />
         <Btn title="Insert HTML page" label="🌐 HTML"
           onClick={() => editor.chain().focus().insertHtmlPage().run()} />
-        <Btn title="Insert Excalidraw drawing" label="🎨 Excalidraw"
-          onClick={() => editor.chain().focus().insertExcalidraw().run()} />
       </div>
 
       {editor.isActive('table') && (

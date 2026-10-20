@@ -65,14 +65,6 @@ function block(n: PMNode): string {
       const meta = `<!-- devdocs:htmlPage title="${title.replace(/"/g, '&quot;')}" src="${src}" height="${height}" size="${size}" -->`
       return '```html\n' + meta + (html ? '\n' + html : '') + '\n```'
     }
-    case 'excalidraw': {
-      const a = n.attrs ?? {}
-      const url = (a.url as string) || ''
-      const title = (a.title as string) || 'Excalidraw Drawing'
-      const height = (a.height as number) || 520
-      const size = (a.size as string) || 'large'
-      return `<!-- devdocs:excalidraw url="${url}" title="${title.replace(/"/g, '&quot;')}" height="${height}" size="${size}" -->\n[${title}](${url})`
-    }
     case 'codeRef': {
       // Degrade to a permalink line + the pinned snippet as a fenced block, so
       // it reads correctly in a plain Git repo even without the custom node.
@@ -217,37 +209,6 @@ export function markdownToDoc(md: string): PMNode {
       } else {
         content.push({ type: 'codeBlock', attrs: { language: lang || null }, content: [{ type: 'text', text: body.join('\n') }] })
       }
-      continue
-    }
-
-    // Excalidraw block
-    const excalMeta = line.match(/^<!-- devdocs:excalidraw url="([^"]*)"(?: title="([^"]*)")?(?: height="([^"]*)")?(?: size="([^"]*)")? -->/)
-    if (excalMeta) {
-      flushPara(para)
-      const url = excalMeta[1]
-      const title = excalMeta[2] || 'Excalidraw Drawing'
-      const height = excalMeta[3] ? Number(excalMeta[3]) : 520
-      const size = excalMeta[4] || 'large'
-      content.push({ type: 'excalidraw', attrs: { url, title, height, size } })
-      i++
-      if (i < lines.length && lines[i].startsWith('[')) i++
-      continue
-    }
-
-    // Standalone Excalidraw link line
-    const excalLink = line.match(/^\[([^\]]*)\]\((https?:\/\/(?:www\.)?(?:link\.)?excalidraw\.com\/[^\)]+)\)\s*$/)
-    if (excalLink) {
-      flushPara(para)
-      content.push({
-        type: 'excalidraw',
-        attrs: {
-          title: excalLink[1] || 'Excalidraw Drawing',
-          url: excalLink[2],
-          height: 520,
-          size: 'large',
-        },
-      })
-      i++
       continue
     }
 

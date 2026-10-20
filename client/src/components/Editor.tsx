@@ -22,10 +22,8 @@ import { CommentMark } from './CommentMark'
 import { MermaidNode } from './Mermaid'
 import { CodeRef } from './CodeRef'
 import { HtmlPageNode } from './HtmlPage'
-import { ExcalidrawNode, isExcalidrawUrl } from './Excalidraw'
 import MermaidModal from './MermaidModal'
 import HtmlPageModal from './HtmlPageModal'
-import ExcalidrawModal from './ExcalidrawModal'
 import DiagramifyModal from './DiagramifyModal'
 import { docs, comments, images, type Role, type Thread as ThreadT, type DocStatus } from '../lib/api'
 import { accessToken } from '../lib/supabase'
@@ -553,7 +551,6 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                 { label: 'HTML page', disabled: !canEdit, onClick: () => ed?.chain().focus().insertHtmlPage().run() },
                 { label: 'Upload HTML file…', disabled: !canEdit, onClick: () => htmlInputRef.current?.click() },
                 { label: 'Mermaid diagram', disabled: !canEdit, onClick: () => ed?.chain().focus().insertMermaid().run() },
-                { label: 'Excalidraw drawing…', disabled: !canEdit, onClick: () => ed?.chain().focus().insertExcalidraw().run() },
                 { label: '✨ Diagramify with AI…', disabled: !canEdit, onClick: () => window.dispatchEvent(new CustomEvent('dx-open-ai', { detail: 'diagram' })) },
                 { label: 'Code reference (GitHub)…', disabled: !canEdit, onClick: () => ed?.chain().focus().insertCodeRef().run() },
               ]}
@@ -773,7 +770,6 @@ function CollabEditor({
       MermaidNode,
       CodeRef,
       HtmlPageNode,
-      ExcalidrawNode,
       Image.configure({ inline: false, allowBase64: false }),
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({
@@ -801,12 +797,6 @@ function CollabEditor({
       // Paste an image (e.g. a screenshot) → upload to storage, insert the URL.
       handlePaste(_view, event) {
         if (!editable) return false
-        const text = event.clipboardData?.getData('text/plain')?.trim()
-        if (text && isExcalidrawUrl(text)) {
-          event.preventDefault()
-          editor?.chain().focus().insertExcalidraw({ url: text }).run()
-          return true
-        }
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith('image/'),
         )
@@ -928,18 +918,6 @@ function CollabEditor({
     return () => window.removeEventListener('dx-html-enlarge', onHtmlEnlarge)
   }, [])
 
-  // Excalidraw drawing fullscreen enlarge: NodeView dispatches { url, title }
-  const [excalidrawModalData, setExcalidrawModalData] = useState<{ url: string; title?: string } | null>(null)
-  useEffect(() => {
-    const onExcalEnlarge = (e: Event) => {
-      const detail = (e as CustomEvent).detail
-      if (detail && detail.url) {
-        setExcalidrawModalData(detail)
-      }
-    }
-    window.addEventListener('dx-excalidraw-enlarge', onExcalEnlarge)
-    return () => window.removeEventListener('dx-excalidraw-enlarge', onExcalEnlarge)
-  }, [])
   useEffect(() => {
     if (!lightbox) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setLightbox(null)
@@ -1494,14 +1472,6 @@ function CollabEditor({
           src={htmlModalData.src}
           title={htmlModalData.title}
           onClose={() => setHtmlModalData(null)}
-        />
-      )}
-
-      {excalidrawModalData && (
-        <ExcalidrawModal
-          url={excalidrawModalData.url}
-          title={excalidrawModalData.title}
-          onClose={() => setExcalidrawModalData(null)}
         />
       )}
 
