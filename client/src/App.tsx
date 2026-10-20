@@ -7,8 +7,7 @@ import ShareDialog from './components/ShareDialog'
 import ConnectAiModal from './components/ConnectAiModal'
 import ConsentScreen from './components/ConsentScreen'
 import LaunchPage from './components/LaunchPage'
-import AnalyticsModal from './components/AnalyticsModal'
-import { recordVisit } from './lib/analytics'
+import { posthog, identifyUser, resetUser } from './lib/posthog'
 import { auth, docs, type User, type DocDetail } from './lib/api'
 import { pushRecent } from './lib/recent'
 import { syncFoldersFromRemote } from './lib/folders'
@@ -44,7 +43,6 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [sharing, setSharing] = useState(false)
   const [connectOpen, setConnectOpen] = useState(false)
-  const [analyticsOpen, setAnalyticsOpen] = useState(false)
   // Allow viewing standalone launching page at /launch or /landing without needing login
   const [isLaunch, setIsLaunch] = useState(isLaunchPath())
 
@@ -54,10 +52,10 @@ export default function App() {
     return () => window.removeEventListener('popstate', checkPath)
   }, [])
 
-  // Track page visits and daily visitors into Supabase
+  // Track pageviews into PostHog
   useEffect(() => {
-    void recordVisit(user?.id)
-  }, [selectedId, isLaunch, user?.id])
+    posthog.capture('$pageview', { path: window.location.pathname })
+  }, [selectedId, isLaunch])
 
   // Navigate: push a new URL and update selection. Passing null goes home (/).
   const navigate = useCallback((id: string | null) => {
@@ -79,7 +77,10 @@ export default function App() {
       .current()
       .then((u) => {
         setUser(u)
-        if (u) void syncFoldersFromRemote()
+        if (u) {
+          identifyUser(u.id, { email: u.email, name: u.name })
+          void syncFoldersFromRemote()
+        }
       })
       .catch(() => setUser(null))
       .finally(() => setAuthChecked(true))
@@ -112,6 +113,7 @@ export default function App() {
 
   async function logout() {
     await auth.signOut().catch(() => undefined)
+    resetUser()
     setUser(null)
     navigate(null)
     setDetail(null)
@@ -172,7 +174,6 @@ export default function App() {
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>
           <span className="user-email">{user.name || user.email}</span>
-          <button className="header-btn" onClick={() => setAnalyticsOpen(true)} title="View site traffic and daily visitors">📊 Traffic</button>
           <button className="header-btn" onClick={() => setConnectOpen(true)} title="Connect an AI agent via MCP">Connect AI</button>
           <button className="header-btn ghost" onClick={logout}>Log out</button>
         </div>
@@ -208,7 +209,6 @@ export default function App() {
         <ShareDialog docId={selectedId} isOwner={detail.role === 'OWNER'} onClose={() => setSharing(false)} />
       )}
       <ConnectAiModal isOpen={connectOpen} onClose={() => setConnectOpen(false)} />
-      <AnalyticsModal isOpen={analyticsOpen} onClose={() => setAnalyticsOpen(false)} />
     </div>
   )
 }
