@@ -262,12 +262,16 @@
 }
 
 /* Folder Nested Document List */
+.folder-children-block {
+  display: flex;
+  flex-direction: column;
+}
+
 .folder-doc-list {
   list-style: none;
   margin: 0;
-  padding: 2px 0 4px 18px;
+  padding: 2px 0 4px 14px;
   border-left: 1.5px solid #e5e7eb;
-  margin-left: 14px;
 }
 
 .folder-empty-hint {

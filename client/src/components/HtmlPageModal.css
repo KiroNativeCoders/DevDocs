@@ -1,0 +1,364 @@
+/* Fullscreen HTML Page Modal Styles */
+
+.html-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.html-modal-card {
+  width: 96vw;
+  height: 94vh;
+  max-width: 1500px;
+  background: #ffffff;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+  border: 1px solid #e2e8f0;
+}
+
+/* Header */
+.html-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  gap: 12px;
+}
+
+.hm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hm-header-icon {
+  font-size: 18px;
+}
+
+.hm-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.hm-header-center {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.hm-view-toggle,
+.hm-device-switcher {
+  display: inline-flex;
+  background: #edeef2;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.hm-view-btn,
+.hm-device-btn {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.hm-view-btn:hover,
+.hm-device-btn:hover {
+  color: #0f172a;
+}
+
+.hm-view-btn.active,
+.hm-device-btn.active {
+  background: #ffffff;
+  color: #2563eb;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.hm-zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  background: #edeef2;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.hm-tool-btn {
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hm-tool-btn:hover {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.hm-zoom-pill {
+  border: none;
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #334155;
+  padding: 0 6px;
+  cursor: pointer;
+}
+
+.hm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hm-action-btn {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.hm-action-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.hm-close-btn {
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 6px;
+  font-size: 15px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.hm-close-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Viewport Area */
+.html-modal-viewport {
+  flex: 1;
+  overflow: auto;
+  background: #f1f5f9;
+  display: flex;
+  position: relative;
+}
+
+.hm-preview-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+  overflow: auto;
+  min-height: 100%;
+}
+
+.hm-device-frame {
+  height: 100%;
+  min-height: 540px;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: width 0.2s ease, transform 0.15s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.hm-device-frame.device-tablet {
+  border: 8px solid #334155;
+  border-radius: 16px;
+}
+
+.hm-device-frame.device-mobile {
+  border: 10px solid #1e293b;
+  border-radius: 24px;
+}
+
+.hm-iframe {
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  border: none;
+  background: #ffffff;
+}
+
+/* Split and Code Modes */
+.hm-split-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+.hm-code-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+  border-right: 1px solid #334155;
+}
+
+.hm-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #1e293b;
+  color: #cbd5e1;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-bottom: 1px solid #334155;
+}
+
+.hm-copy-btn {
+  border: 1px solid #475569;
+  background: #334155;
+  color: #f8fafc;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.hm-copy-btn:hover {
+  background: #475569;
+}
+
+.hm-code-editor {
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
+  background: #0f172a;
+  color: #f8fafc;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  padding: 16px;
+  border: none;
+  outline: none;
+  resize: none;
+}
+
+/* Footer */
+.html-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 18px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.hm-footer-hint {
+  font-weight: 500;
+  color: #94a3b8;
+}
+
+/* Dark Theme */
+[data-theme="dark"] .html-modal-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .html-modal-header,
+[data-theme="dark"] .html-modal-footer {
+  background: #0f172a;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .hm-header-title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .hm-view-toggle,
+[data-theme="dark"] .hm-device-switcher,
+[data-theme="dark"] .hm-zoom-group {
+  background: #1e293b;
+}
+
+[data-theme="dark"] .hm-view-btn,
+[data-theme="dark"] .hm-device-btn {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .hm-view-btn:hover,
+[data-theme="dark"] .hm-device-btn:hover {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .hm-view-btn.active,
+[data-theme="dark"] .hm-device-btn.active {
+  background: #334155;
+  color: #38bdf8;
+}
+
+[data-theme="dark"] .hm-action-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .hm-action-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .hm-close-btn {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .hm-close-btn:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .html-modal-viewport {
+  background: #0b1120;
+}

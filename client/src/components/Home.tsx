@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { docs as docsApi, type DocMeta } from '../lib/api'
 import { getRecentIds } from '../lib/recent'
-import { getDocFolders, getFolders, type Folder } from '../lib/folders'
+import { getDocFolders, getFolders, getFolderPath, type Folder } from '../lib/folders'
 import './Home.css'
 
 type Props = {
@@ -62,8 +62,8 @@ export default function Home({ userName, refreshKey, onOpen, onNewDoc }: Props) 
         <div className="hc-bottom">
           <span className="hc-meta">{sub}</span>
           {folder && (
-            <span className="hc-folder" title={`Folder: ${folder.name}`}>
-              📁 {folder.name}
+            <span className="hc-folder" title={`Folder: ${getFolderPath(folder.id, folders)}`}>
+              📁 {getFolderPath(folder.id, folders)}
             </span>
           )}
         </div>

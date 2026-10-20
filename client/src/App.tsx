@@ -5,9 +5,16 @@ import Home from './components/Home'
 import Auth from './components/Auth'
 import ShareDialog from './components/ShareDialog'
 import ConnectAiModal from './components/ConnectAiModal'
+import LaunchPage from './components/LaunchPage'
 import { auth, docs, type User, type DocDetail } from './lib/api'
 import { pushRecent } from './lib/recent'
+import { syncFoldersFromRemote } from './lib/folders'
 import './App.css'
+
+// Check if current URL is the standalone landing/launching page.
+function isLaunchPath(): boolean {
+  return window.location.pathname === '/launch' || window.location.pathname === '/landing'
+}
 
 // Read the current document id from the URL (/doc/:id), or null for home (/).
 function idFromPath(): string | null {
@@ -53,7 +60,10 @@ export default function App() {
   useEffect(() => {
     auth
       .current()
-      .then(setUser)
+      .then((u) => {
+        setUser(u)
+        if (u) void syncFoldersFromRemote()
+      })
       .catch(() => setUser(null))
       .finally(() => setAuthChecked(true))
   }, [])
@@ -103,6 +113,23 @@ export default function App() {
       : detail?.role === 'EDITOR'
         ? 'Shared · can edit'
         : 'Shared · view only'
+
+  // Allow viewing standalone launching page at /launch or /landing without needing login
+  const [isLaunch, setIsLaunch] = useState(isLaunchPath())
+
+  useEffect(() => {
+    const checkPath = () => setIsLaunch(isLaunchPath())
+    window.addEventListener('popstate', checkPath)
+    return () => window.removeEventListener('popstate', checkPath)
+  }, [])
+
+  if (isLaunch) {
+    return <LaunchPage onStartWriting={() => {
+      window.history.pushState({}, '', '/')
+      setIsLaunch(false)
+      setSelectedId(null)
+    }} />
+  }
 
   if (!authChecked) return <div className="app-boot">Loading…</div>
   if (!user) return <Auth onAuthed={setUser} />

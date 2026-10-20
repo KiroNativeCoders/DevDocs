@@ -285,6 +285,99 @@ app.get('/api/docs/:id/reviews', requireAuth, async (req, res) => {
   res.json(data ?? [])
 })
 
+// ------------------------------------------------------------- folders
+// Folder metadata and doc-to-folder mapping persisted in Postgres/Supabase.
+// Using app_folder and app_doc_folder tables (with graceful fallback if table not yet migrated).
+app.get('/api/folders', requireAuth, async (req, res) => {
+  const userId = req.user!.id
+  const { data, error } = await admin
+    .from('app_folder')
+    .select('id,name,parent_id,created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    // If table doesn't exist yet, return empty list gracefully
+    return res.json([])
+  }
+  const formatted = (data ?? []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    parentId: row.parent_id,
+    createdAt: row.created_at,
+  }))
+  res.json(formatted)
+})
+
+app.post('/api/folders', requireAuth, async (req, res) => {
+  const userId = req.user!.id
+  const { id, name, parentId } = req.body ?? {}
+  if (!id || !name) return res.status(400).json({ error: 'id and name required' })
+
+  const { error } = await admin.from('app_folder').upsert({
+    id,
+    user_id: userId,
+    name: String(name).trim(),
+    parent_id: parentId || null,
+  })
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+app.delete('/api/folders/:id', requireAuth, async (req, res) => {
+  const userId = req.user!.id
+  const folderId = req.params.id
+
+  const { error } = await admin
+    .from('app_folder')
+    .delete()
+    .eq('id', folderId)
+    .eq('user_id', userId)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
+app.get('/api/folders/mapping', requireAuth, async (req, res) => {
+  const userId = req.user!.id
+  const { data, error } = await admin
+    .from('app_doc_folder')
+    .select('document_id,folder_id')
+    .eq('user_id', userId)
+
+  if (error) return res.json({})
+  const mapping: Record<string, string> = {}
+  for (const row of data ?? []) {
+    if (row.document_id && row.folder_id) {
+      mapping[row.document_id] = row.folder_id
+    }
+  }
+  res.json(mapping)
+})
+
+app.post('/api/folders/mapping', requireAuth, async (req, res) => {
+  const userId = req.user!.id
+  const { docId, folderId } = req.body ?? {}
+  if (!docId) return res.status(400).json({ error: 'docId required' })
+
+  if (!folderId) {
+    await admin
+      .from('app_doc_folder')
+      .delete()
+      .eq('user_id', userId)
+      .eq('document_id', docId)
+    return res.json({ ok: true })
+  }
+
+  const { error } = await admin.from('app_doc_folder').upsert({
+    user_id: userId,
+    document_id: docId,
+    folder_id: folderId,
+  }, { onConflict: 'user_id,document_id' })
+
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ ok: true })
+})
+
 // ------------------------------------------------------------- API tokens
 // Personal tokens for the remote MCP server. The raw token is returned ONCE on
 // creation and never stored (only its hash). All run as the authenticated user.

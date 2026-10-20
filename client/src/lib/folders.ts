@@ -1,16 +1,22 @@
 // Folder management for DXEditor documents.
-// Stores folder definitions and doc-to-folder assignments in localStorage.
+// Persists folder definitions and doc-to-folder assignments to Postgres via the backend API,
+// with automatic local fallback & caching for instant UI response and offline resilience.
+
+import { foldersApi } from './api'
 
 export type Folder = {
   id: string
   name: string
   createdAt: string
   color?: string
+  parentId?: string | null
 }
 
 const FOLDERS_KEY = 'dx_folders'
 const DOC_FOLDERS_KEY = 'dx_doc_folders'
 const FOLDER_COLLAPSED_KEY = 'dx_folder_collapsed'
+
+let isSyncing = false
 
 export function getFolders(): Folder[] {
   try {
@@ -32,15 +38,40 @@ export function saveFolders(folders: Folder[]): void {
   }
 }
 
-export function createFolder(name: string): Folder {
+/** Sync folders and doc-folder assignments from Postgres to local storage */
+export async function syncFoldersFromRemote(): Promise<void> {
+  if (isSyncing) return
+  isSyncing = true
+  try {
+    const remoteFolders = await foldersApi.list()
+    if (Array.isArray(remoteFolders) && remoteFolders.length > 0) {
+      saveFolders(remoteFolders)
+    }
+    const remoteMapping = await foldersApi.getMapping()
+    if (remoteMapping && typeof remoteMapping === 'object') {
+      saveDocFolders(remoteMapping)
+    }
+  } catch {
+    // offline or backend table initializing
+  } finally {
+    isSyncing = false
+  }
+}
+
+export function createFolder(name: string, parentId: string | null = null): Folder {
   const trimmed = name.trim() || 'Untitled Folder'
   const newFolder: Folder = {
     id: 'f_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7),
     name: trimmed,
     createdAt: new Date().toISOString(),
+    parentId: parentId || null,
   }
   const current = getFolders()
   saveFolders([...current, newFolder])
+
+  // Persist asynchronously to Postgres
+  void foldersApi.save(newFolder.id, newFolder.name, newFolder.parentId)
+
   return newFolder
 }
 
@@ -50,25 +81,87 @@ export function renameFolder(folderId: string, newName: string): void {
   const current = getFolders()
   const updated = current.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f))
   saveFolders(updated)
+
+  const target = updated.find((f) => f.id === folderId)
+  if (target) {
+    void foldersApi.save(target.id, target.name, target.parentId)
+  }
+}
+
+export function moveFolder(folderId: string, targetParentId: string | null): void {
+  if (folderId === targetParentId) return
+  const current = getFolders()
+  
+  // Prevent moving a folder into its own descendant (prevent circular nesting)
+  const descendants = getDescendantFolderIds(folderId, current)
+  if (targetParentId && descendants.has(targetParentId)) return
+
+  const updated = current.map((f) =>
+    f.id === folderId ? { ...f, parentId: targetParentId || null } : f
+  )
+  saveFolders(updated)
+
+  const target = updated.find((f) => f.id === folderId)
+  if (target) {
+    void foldersApi.save(target.id, target.name, target.parentId)
+  }
+}
+
+export function getDescendantFolderIds(folderId: string, allFolders = getFolders()): Set<string> {
+  const result = new Set<string>()
+  function collect(id: string) {
+    for (const f of allFolders) {
+      if (f.parentId === id && !result.has(f.id)) {
+        result.add(f.id)
+        collect(f.id)
+      }
+    }
+  }
+  collect(folderId)
+  return result
 }
 
 export function deleteFolder(folderId: string): void {
   const current = getFolders()
-  const remaining = current.filter((f) => f.id !== folderId)
+  // Collect this folder and all its descendant subfolders
+  const toDelete = getDescendantFolderIds(folderId, current)
+  toDelete.add(folderId)
+
+  const remaining = current.filter((f) => !toDelete.has(f.id))
   saveFolders(remaining)
 
-  // Remove doc mappings for this folder so docs return to Root/Unfiled
+  // Persist folder deletions to Postgres
+  for (const id of toDelete) {
+    void foldersApi.remove(id)
+  }
+
+  // Remove doc mappings for deleted folders so docs return to Root/Unfiled
   const mapping = getDocFolders()
   let changed = false
   for (const docId of Object.keys(mapping)) {
-    if (mapping[docId] === folderId) {
+    if (toDelete.has(mapping[docId])) {
       delete mapping[docId]
+      void foldersApi.saveDocFolder(docId, null)
       changed = true
     }
   }
   if (changed) {
     saveDocFolders(mapping)
   }
+}
+
+export function getFolderPath(folderId: string | null, allFolders = getFolders()): string {
+  if (!folderId) return ''
+  const byId = new Map(allFolders.map((f) => [f.id, f]))
+  const parts: string[] = []
+  let curr = byId.get(folderId)
+  const seen = new Set<string>()
+  while (curr && !seen.has(curr.id)) {
+    seen.add(curr.id)
+    parts.unshift(curr.name)
+    curr = curr.parentId ? byId.get(curr.parentId) : undefined
+  }
+  return parts.join(' / ')
 }
 
 export function getDocFolders(): Record<string, string> {
@@ -107,6 +200,9 @@ export function moveDocToFolder(docId: string, folderId: string | null): void {
     mapping[docId] = folderId
     saveDocFolders(mapping)
   }
+
+  // Persist to Postgres
+  void foldersApi.saveDocFolder(docId, folderId)
 }
 
 export function getCollapsedFolderIds(): string[] {

@@ -21,7 +21,11 @@ import Menu from './Menu'
 import { CommentMark } from './CommentMark'
 import { MermaidNode } from './Mermaid'
 import { CodeRef } from './CodeRef'
+import { HtmlPageNode } from './HtmlPage'
+import { ExcalidrawNode, isExcalidrawUrl } from './Excalidraw'
 import MermaidModal from './MermaidModal'
+import HtmlPageModal from './HtmlPageModal'
+import ExcalidrawModal from './ExcalidrawModal'
 import DiagramifyModal from './DiagramifyModal'
 import { docs, comments, images, type Role, type Thread as ThreadT, type DocStatus } from '../lib/api'
 import { accessToken } from '../lib/supabase'
@@ -39,6 +43,7 @@ import {
   getDocFolderId,
   moveDocToFolder,
   createFolder,
+  getFolderPath,
 } from '../lib/folders'
 import './Editor.css'
 
@@ -241,6 +246,19 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
     }
   }
 
+  // Hidden file input for uploading an HTML page file (.html / .htm)
+  const htmlInputRef = useRef<HTMLInputElement | null>(null)
+  async function insertHtmlFile(file: File) {
+    if (!ed || !canEdit) return
+    try {
+      const text = await file.text()
+      const pageTitle = file.name.replace(/\.[^/.]+$/, '')
+      ed.chain().focus().insertHtmlPage({ html: text, title: pageTitle }).run()
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : 'Could not read HTML file')
+    }
+  }
+
   // --- Phase 4: Markdown round-trip (docs-as-code) ---
   const mdInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -416,6 +434,17 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
           e.target.value = ''
         }}
       />
+      <input
+        ref={htmlInputRef}
+        type="file"
+        accept=".html,.htm,text/html"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void insertHtmlFile(f)
+          e.target.value = ''
+        }}
+      />
       <div className="editor-topbar">
         <div className="title-block">
           <div className="doc-title-row">
@@ -435,7 +464,7 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                 title="Organize into folder"
               >
                 <span className="dfc-icon">📁</span>
-                <span className="dfc-name">{currentFolder ? currentFolder.name : 'Unfiled'}</span>
+                <span className="dfc-name">{currentFolder ? getFolderPath(currentFolder.id, folders) : 'Unfiled'}</span>
                 <span className="dfc-arrow">▾</span>
               </button>
 
@@ -454,21 +483,25 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                     <span className="dfd-item-name">Unfiled</span>
                     {!currentFolderId && <span className="dfd-item-check">✓</span>}
                   </button>
-                  {folders.map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      className={`dfd-item${currentFolderId === f.id ? ' is-active' : ''}`}
-                      onClick={() => {
-                        moveDocToFolder(docId, f.id)
-                        setFolderPickerOpen(false)
-                      }}
-                    >
-                      <span className="dfd-item-icon">📁</span>
-                      <span className="dfd-item-name">{f.name}</span>
-                      {currentFolderId === f.id && <span className="dfd-item-check">✓</span>}
-                    </button>
-                  ))}
+                  {folders.map((f) => {
+                    const fullPath = getFolderPath(f.id, folders)
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        className={`dfd-item${currentFolderId === f.id ? ' is-active' : ''}`}
+                        title={fullPath}
+                        onClick={() => {
+                          moveDocToFolder(docId, f.id)
+                          setFolderPickerOpen(false)
+                        }}
+                      >
+                        <span className="dfd-item-icon">📁</span>
+                        <span className="dfd-item-name">{fullPath || f.name}</span>
+                        {currentFolderId === f.id && <span className="dfd-item-check">✓</span>}
+                      </button>
+                    )
+                  })}
                   <div className="dfd-divider" />
                   <button
                     type="button"
@@ -522,7 +555,10 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                 { label: 'Code block', disabled: !canEdit, onClick: () => ed?.chain().focus().toggleCodeBlock().run() },
                 { label: 'Divider', disabled: !canEdit, onClick: () => ed?.chain().focus().setHorizontalRule().run() },
                 { label: 'Image…', disabled: !canEdit, onClick: () => imageInputRef.current?.click() },
+                { label: 'HTML page', disabled: !canEdit, onClick: () => ed?.chain().focus().insertHtmlPage().run() },
+                { label: 'Upload HTML file…', disabled: !canEdit, onClick: () => htmlInputRef.current?.click() },
                 { label: 'Mermaid diagram', disabled: !canEdit, onClick: () => ed?.chain().focus().insertMermaid().run() },
+                { label: 'Excalidraw drawing…', disabled: !canEdit, onClick: () => ed?.chain().focus().insertExcalidraw().run() },
                 { label: '✨ Diagramify with AI…', disabled: !canEdit, onClick: () => window.dispatchEvent(new CustomEvent('dx-open-ai', { detail: 'diagram' })) },
                 { label: 'Code reference (GitHub)…', disabled: !canEdit, onClick: () => ed?.chain().focus().insertCodeRef().run() },
               ]}
@@ -742,6 +778,8 @@ function CollabEditor({
       CommentMark,
       MermaidNode,
       CodeRef,
+      HtmlPageNode,
+      ExcalidrawNode,
       Image.configure({ inline: false, allowBase64: false }),
       Collaboration.configure({ document: ydoc }),
       CollaborationCaret.configure({
@@ -764,6 +802,12 @@ function CollabEditor({
       // Paste an image (e.g. a screenshot) → upload to storage, insert the URL.
       handlePaste(_view, event) {
         if (!editable) return false
+        const text = event.clipboardData?.getData('text/plain')?.trim()
+        if (text && isExcalidrawUrl(text)) {
+          event.preventDefault()
+          editor?.chain().focus().insertExcalidraw({ url: text }).run()
+          return true
+        }
         const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith('image/'),
         )
@@ -870,6 +914,32 @@ function CollabEditor({
     }
     window.addEventListener('dx-mermaid-enlarge', onEnlarge)
     return () => window.removeEventListener('dx-mermaid-enlarge', onEnlarge)
+  }, [])
+
+  // HTML page fullscreen enlarge: NodeView dispatches { html, src, title }
+  const [htmlModalData, setHtmlModalData] = useState<{ html?: string; src?: string; title?: string } | null>(null)
+  useEffect(() => {
+    const onHtmlEnlarge = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail) {
+        setHtmlModalData(detail)
+      }
+    }
+    window.addEventListener('dx-html-enlarge', onHtmlEnlarge)
+    return () => window.removeEventListener('dx-html-enlarge', onHtmlEnlarge)
+  }, [])
+
+  // Excalidraw drawing fullscreen enlarge: NodeView dispatches { url, title }
+  const [excalidrawModalData, setExcalidrawModalData] = useState<{ url: string; title?: string } | null>(null)
+  useEffect(() => {
+    const onExcalEnlarge = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail && detail.url) {
+        setExcalidrawModalData(detail)
+      }
+    }
+    window.addEventListener('dx-excalidraw-enlarge', onExcalEnlarge)
+    return () => window.removeEventListener('dx-excalidraw-enlarge', onExcalEnlarge)
   }, [])
   useEffect(() => {
     if (!lightbox) return
@@ -1384,6 +1454,7 @@ function CollabEditor({
           font={font}
           onChangeFont={onChangeFont}
           onOpenAi={triggerAiFromToolbar}
+          onOpenSettings={() => setAiSettingsOpen(true)}
         />
       )}
       <EditorContent editor={editor} className={`editor-content font-${font}`} />
@@ -1402,6 +1473,23 @@ function CollabEditor({
           svg={mermaidModalData.svg}
           source={mermaidModalData.source}
           onClose={() => setMermaidModalData(null)}
+        />
+      )}
+
+      {htmlModalData && (
+        <HtmlPageModal
+          html={htmlModalData.html}
+          src={htmlModalData.src}
+          title={htmlModalData.title}
+          onClose={() => setHtmlModalData(null)}
+        />
+      )}
+
+      {excalidrawModalData && (
+        <ExcalidrawModal
+          url={excalidrawModalData.url}
+          title={excalidrawModalData.title}
+          onClose={() => setExcalidrawModalData(null)}
         />
       )}
 

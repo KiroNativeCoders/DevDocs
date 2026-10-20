@@ -11,6 +11,7 @@ import {
   moveDocToFolder,
   getCollapsedFolderIds,
   setFolderCollapsed,
+  getFolderPath,
 } from '../lib/folders'
 import './Sidebar.css'
 
@@ -30,7 +31,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
   const [error, setError] = useState<string | null>(null)
 
   // Creation & Editing states
-  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [creatingParentId, setCreatingParentId] = useState<string | null | undefined>(undefined) // undefined = closed, null = root, string = subfolder
   const [newFolderName, setNewFolderName] = useState('')
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
   const [editingFolderName, setEditingFolderName] = useState('')
@@ -116,17 +117,19 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
   function handleSaveNewFolder() {
     const trimmed = newFolderName.trim()
     if (!trimmed) {
-      setCreatingFolder(false)
+      setCreatingParentId(undefined)
       return
     }
-    const created = createFolder(trimmed)
+    const parentId = creatingParentId === undefined ? null : creatingParentId
+    const created = createFolder(trimmed, parentId)
     setFolders(getFolders())
     setNewFolderName('')
-    setCreatingFolder(false)
-    // Expand newly created folder
+    setCreatingParentId(undefined)
+    // Expand newly created folder and its parent
     setCollapsedIds((prev) => {
       const next = new Set(prev)
       next.delete(created.id)
+      if (parentId) next.delete(parentId)
       return next
     })
   }
@@ -144,7 +147,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
     e.stopPropagation()
     if (
       !confirm(
-        `Delete folder "${folderName}"? Documents inside will remain safe in Unfiled Documents.`
+        `Delete folder "${folderName}" and its subfolders? Documents inside will remain safe in Unfiled Documents.`
       )
     )
       return
@@ -167,7 +170,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
   function handleOpenMoveMenu(docId: string, e: React.MouseEvent) {
     e.stopPropagation()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setMoveMenuPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 200) })
+    setMoveMenuPos({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - 220) })
     setMovingDocId(docId)
   }
 
@@ -217,6 +220,226 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
     }
   })
 
+  // Build recursive folder tree: parentId -> children folders
+  const folderChildrenMap: Record<string, Folder[]> = {}
+  const rootFolders: Folder[] = []
+
+  folders.forEach((f) => {
+    if (f.parentId) {
+      if (!folderChildrenMap[f.parentId]) folderChildrenMap[f.parentId] = []
+      folderChildrenMap[f.parentId].push(f)
+    } else {
+      rootFolders.push(f)
+    }
+  })
+
+  // Recursive folder node renderer
+  function renderFolderNode(folder: Folder, depth = 0) {
+    const isCollapsed = collapsedIds.has(folder.id)
+    const docList = folderDocsMap[folder.id] || []
+    const subfolders = folderChildrenMap[folder.id] || []
+    const isDragOver = dragOverFolderId === folder.id
+
+    return (
+      <div key={folder.id} className="folder-item">
+        <div
+          className={`folder-head ${isDragOver ? 'is-drop-target' : ''}`}
+          style={{ paddingLeft: `${8 + depth * 14}px` }}
+          onClick={() => toggleFolder(folder.id)}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOverFolderId(folder.id)
+          }}
+          onDragLeave={() => {
+            if (dragOverFolderId === folder.id) setDragOverFolderId(null)
+          }}
+          onDrop={(e) => onDropOnFolder(folder.id, e)}
+        >
+          <button
+            type="button"
+            className="folder-toggle-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleFolder(folder.id)
+            }}
+          >
+            {isCollapsed ? '▸' : '▾'}
+          </button>
+          <span className="folder-icon">{isCollapsed ? '📁' : '📂'}</span>
+
+          {editingFolderId === folder.id ? (
+            <input
+              autoFocus
+              type="text"
+              className="folder-rename-input"
+              value={editingFolderName}
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => setEditingFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveRenameFolder(folder.id)
+                if (e.key === 'Escape') setEditingFolderId(null)
+              }}
+              onBlur={() => handleSaveRenameFolder(folder.id)}
+            />
+          ) : (
+            <span
+              className="folder-name"
+              title={getFolderPath(folder.id, folders)}
+              onDoubleClick={(e) => {
+                e.stopPropagation()
+                setEditingFolderId(folder.id)
+                setEditingFolderName(folder.name)
+              }}
+            >
+              {folder.name}
+            </span>
+          )}
+
+          <span className="folder-count">{docList.length}</span>
+
+          <div className="folder-quick-actions" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="folder-action-btn"
+              title="New document in this folder"
+              onClick={() => handleCreateDoc(folder.id)}
+            >
+              +
+            </button>
+            <button
+              type="button"
+              className="folder-action-btn"
+              title="Add subfolder inside this folder"
+              onClick={() => {
+                setCreatingParentId(folder.id)
+                setNewFolderName('')
+                if (isCollapsed) toggleFolder(folder.id)
+              }}
+            >
+              📁+
+            </button>
+            <button
+              type="button"
+              className="folder-action-btn"
+              title="Rename folder"
+              onClick={() => {
+                setEditingFolderId(folder.id)
+                setEditingFolderName(folder.name)
+              }}
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              className="folder-action-btn danger"
+              title="Delete folder"
+              onClick={(e) => handleDeleteFolder(folder.id, folder.name, e)}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* Inline subfolder creation form directly under this folder */}
+        {creatingParentId === folder.id && (
+          <div className="sidebar-inline-form" style={{ marginLeft: `${18 + depth * 14}px` }}>
+            <span className="inline-folder-icon">📁</span>
+            <input
+              autoFocus
+              type="text"
+              className="sidebar-inline-input"
+              placeholder="Subfolder name…"
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveNewFolder()
+                if (e.key === 'Escape') setCreatingParentId(undefined)
+              }}
+            />
+            <button
+              type="button"
+              className="sidebar-inline-btn primary"
+              onClick={handleSaveNewFolder}
+            >
+              ✓
+            </button>
+            <button
+              type="button"
+              className="sidebar-inline-btn"
+              onClick={() => setCreatingParentId(undefined)}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {!isCollapsed && (
+          <div className="folder-children-block">
+            {/* 1. Render nested subfolders */}
+            {subfolders.map((sub) => renderFolderNode(sub, depth + 1))}
+
+            {/* 2. Render documents in this folder */}
+            <ul
+              className="folder-doc-list"
+              style={{ marginLeft: `${14 + depth * 14}px` }}
+              onDragOver={(e) => {
+                e.preventDefault()
+                setDragOverFolderId(folder.id)
+              }}
+              onDrop={(e) => onDropOnFolder(folder.id, e)}
+            >
+              {docList.length === 0 && subfolders.length === 0 ? (
+                <li className="folder-empty-hint">Drop docs or click + to add</li>
+              ) : (
+                docList.map((d) => (
+                  <li
+                    key={d.id}
+                    draggable
+                    onDragStart={(e) => onDragStartDoc(d.id, e)}
+                    onDragEnd={onDragEndDoc}
+                    className={`doc-item in-folder ${d.id === selectedId ? 'is-selected' : ''} ${
+                      draggingDocId === d.id ? 'is-dragging' : ''
+                    }`}
+                    onClick={() => onSelect(d.id)}
+                  >
+                    <span className="doc-icon">📄</span>
+                    <div className="doc-item-main">
+                      <span className="doc-item-title">{d.title || 'Untitled document'}</span>
+                      {d.status && d.status !== 'DRAFT' && (
+                        <span className="doc-tag doc-tag-status" style={{ color: statusMeta(d.status).color }}>
+                          <span className="doc-tag-dot" style={{ background: statusMeta(d.status).color }} />
+                          {statusMeta(d.status).label}
+                        </span>
+                      )}
+                    </div>
+                    <div className="doc-item-actions">
+                      <button
+                        type="button"
+                        className="doc-move-btn"
+                        title="Move to another folder"
+                        onClick={(e) => handleOpenMoveMenu(d.id, e)}
+                      >
+                        📁
+                      </button>
+                      <button
+                        type="button"
+                        className="doc-del"
+                        title="Delete document"
+                        onClick={(e) => handleDeleteDoc(d.id, e)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <aside className="sidebar">
       <div className="sidebar-head">
@@ -226,10 +449,10 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
             type="button"
             className="sidebar-btn-ghost"
             onClick={() => {
-              setCreatingFolder(true)
+              setCreatingParentId(null)
               setNewFolderName('')
             }}
-            title="Create new folder"
+            title="Create root folder"
           >
             📁+ Folder
           </button>
@@ -244,7 +467,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
         </div>
       </div>
 
-      {creatingFolder && (
+      {creatingParentId === null && (
         <div className="sidebar-inline-form">
           <span className="inline-folder-icon">📁</span>
           <input
@@ -256,7 +479,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
             onChange={(e) => setNewFolderName(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSaveNewFolder()
-              if (e.key === 'Escape') setCreatingFolder(false)
+              if (e.key === 'Escape') setCreatingParentId(undefined)
             }}
           />
           <button
@@ -269,13 +492,12 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
           <button
             type="button"
             className="sidebar-inline-btn"
-            onClick={() => setCreatingFolder(false)}
+            onClick={() => setCreatingParentId(undefined)}
           >
             ✕
           </button>
         </div>
       )}
-
 
       {loading && <div className="sidebar-empty">Loading documents…</div>}
       {error && <div className="sidebar-error">{error}</div>}
@@ -290,157 +512,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
             </div>
 
             <div className="folders-list">
-              {folders.map((folder) => {
-                const isCollapsed = collapsedIds.has(folder.id)
-                const docList = folderDocsMap[folder.id] || []
-                const isDragOver = dragOverFolderId === folder.id
-
-                return (
-                  <div key={folder.id} className="folder-item">
-                    <div
-                      className={`folder-head ${isDragOver ? 'is-drop-target' : ''}`}
-                      onClick={() => toggleFolder(folder.id)}
-                      onDragOver={(e) => {
-                        e.preventDefault()
-                        setDragOverFolderId(folder.id)
-                      }}
-                      onDragLeave={() => {
-                        if (dragOverFolderId === folder.id) setDragOverFolderId(null)
-                      }}
-                      onDrop={(e) => onDropOnFolder(folder.id, e)}
-                    >
-                      <button
-                        type="button"
-                        className="folder-toggle-btn"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleFolder(folder.id)
-                        }}
-                      >
-                        {isCollapsed ? '▸' : '▾'}
-                      </button>
-                      <span className="folder-icon">{isCollapsed ? '📁' : '📂'}</span>
-
-                      {editingFolderId === folder.id ? (
-                        <input
-                          autoFocus
-                          type="text"
-                          className="folder-rename-input"
-                          value={editingFolderName}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => setEditingFolderName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveRenameFolder(folder.id)
-                            if (e.key === 'Escape') setEditingFolderId(null)
-                          }}
-                          onBlur={() => handleSaveRenameFolder(folder.id)}
-                        />
-                      ) : (
-                        <span
-                          className="folder-name"
-                          title={folder.name}
-                          onDoubleClick={(e) => {
-                            e.stopPropagation()
-                            setEditingFolderId(folder.id)
-                            setEditingFolderName(folder.name)
-                          }}
-                        >
-                          {folder.name}
-                        </span>
-                      )}
-
-                      <span className="folder-count">{docList.length}</span>
-
-                      <div className="folder-quick-actions" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="folder-action-btn"
-                          title="New document in this folder"
-                          onClick={() => handleCreateDoc(folder.id)}
-                        >
-                          +
-                        </button>
-                        <button
-                          type="button"
-                          className="folder-action-btn"
-                          title="Rename folder"
-                          onClick={() => {
-                            setEditingFolderId(folder.id)
-                            setEditingFolderName(folder.name)
-                          }}
-                        >
-                          ✎
-                        </button>
-                        <button
-                          type="button"
-                          className="folder-action-btn danger"
-                          title="Delete folder"
-                          onClick={(e) => handleDeleteFolder(folder.id, folder.name, e)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    {!isCollapsed && (
-                      <ul
-                        className="folder-doc-list"
-                        onDragOver={(e) => {
-                          e.preventDefault()
-                          setDragOverFolderId(folder.id)
-                        }}
-                        onDrop={(e) => onDropOnFolder(folder.id, e)}
-                      >
-                        {docList.length === 0 ? (
-                          <li className="folder-empty-hint">Drop docs or click + to add</li>
-                        ) : (
-                          docList.map((d) => (
-                            <li
-                              key={d.id}
-                              draggable
-                              onDragStart={(e) => onDragStartDoc(d.id, e)}
-                              onDragEnd={onDragEndDoc}
-                              className={`doc-item in-folder ${d.id === selectedId ? 'is-selected' : ''} ${
-                                draggingDocId === d.id ? 'is-dragging' : ''
-                              }`}
-                              onClick={() => onSelect(d.id)}
-                            >
-                              <span className="doc-icon">📄</span>
-                              <div className="doc-item-main">
-                                <span className="doc-item-title">{d.title || 'Untitled document'}</span>
-                                {d.status && d.status !== 'DRAFT' && (
-                                  <span className="doc-tag doc-tag-status" style={{ color: statusMeta(d.status).color }}>
-                                    <span className="doc-tag-dot" style={{ background: statusMeta(d.status).color }} />
-                                    {statusMeta(d.status).label}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="doc-item-actions">
-                                <button
-                                  type="button"
-                                  className="doc-move-btn"
-                                  title="Move to another folder"
-                                  onClick={(e) => handleOpenMoveMenu(d.id, e)}
-                                >
-                                  📁
-                                </button>
-                                <button
-                                  type="button"
-                                  className="doc-del"
-                                  title="Delete document"
-                                  onClick={(e) => handleDeleteDoc(d.id, e)}
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            </li>
-                          ))
-                        )}
-                      </ul>
-                    )}
-                  </div>
-                )
-              })}
+              {rootFolders.map((folder) => renderFolderNode(folder, 0))}
             </div>
           </div>
         )}
@@ -543,15 +615,17 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
 
             {folders.map((f) => {
               const isCurrent = docFolders[movingDocId] === f.id
+              const fullPath = getFolderPath(f.id, folders)
               return (
                 <button
                   key={f.id}
                   type="button"
                   className={`move-popover-item ${isCurrent ? 'is-active' : ''}`}
                   onClick={() => handleMoveDoc(movingDocId, f.id)}
+                  title={fullPath}
                 >
                   <span className="move-item-icon">📁</span>
-                  <span className="move-item-name">{f.name}</span>
+                  <span className="move-item-name">{fullPath || f.name}</span>
                   {isCurrent && <span className="move-item-check">✓</span>}
                 </button>
               )
@@ -564,7 +638,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
               onClick={() => {
                 const name = prompt('New folder name:')
                 if (name && name.trim()) {
-                  const created = createFolder(name.trim())
+                  const created = createFolder(name.trim(), null)
                   handleMoveDoc(movingDocId, created.id)
                 }
               }}

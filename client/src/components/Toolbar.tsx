@@ -2,6 +2,8 @@ import type { Editor } from '@tiptap/react'
 import Select from './Select'
 import { type FontKey, FONT_OPTIONS } from './Editor'
 import GeminiSparkleIcon from './GeminiSparkleIcon'
+import './HtmlPage'
+import './Excalidraw'
 import './Toolbar.css'
 
 type Props = {
@@ -9,6 +11,7 @@ type Props = {
   font?: FontKey
   onChangeFont?: (font: FontKey) => void
   onOpenAi?: () => void
+  onOpenSettings?: () => void
 }
 
 function Btn({
@@ -54,6 +57,7 @@ export default function Toolbar({
   font,
   onChangeFont,
   onOpenAi,
+  onOpenSettings,
 }: Props) {
   if (!editor) return null
 
@@ -147,6 +151,10 @@ export default function Toolbar({
           onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
         <Btn title="Divider" label="―"
           onClick={() => editor.chain().focus().setHorizontalRule().run()} />
+        <Btn title="Insert HTML page" label="🌐 HTML"
+          onClick={() => editor.chain().focus().insertHtmlPage().run()} />
+        <Btn title="Insert Excalidraw drawing" label="🎨 Excalidraw"
+          onClick={() => editor.chain().focus().insertExcalidraw().run()} />
       </div>
 
       {editor.isActive('table') && (
@@ -171,7 +179,7 @@ export default function Toolbar({
       {onOpenAi && (
         <>
           <span className="tb-sep" />
-          <div className="tb-group">
+          <div className="tb-group" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
             <button
               type="button"
               className="tb-ai-btn"
@@ -182,6 +190,18 @@ export default function Toolbar({
               <GeminiSparkleIcon size={14} />
               AI Buddy
             </button>
+            {onOpenSettings && (
+              <button
+                type="button"
+                className="tb-btn tb-ai-gear"
+                title="AI Settings (API key, model, provider)"
+                aria-label="AI Settings"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={onOpenSettings}
+              >
+                ⚙
+              </button>
+            )}
           </div>
         </>
       )}
