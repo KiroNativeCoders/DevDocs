@@ -225,6 +225,7 @@ function ExcalidrawView({ node, updateAttributes, editor }: NodeViewProps) {
 
               {/* Top-Right Floating Controls: Clean and unobtrusive */}
               <div className="excalidraw-floating-controls">
+                <span className="excalidraw-view-badge" title="Embedded in view-only mode">View only</span>
                 {canEdit && (
                   <span className="excalidraw-drag-handle" data-drag-handle title="Drag to reorder drawing">
                     ⠿

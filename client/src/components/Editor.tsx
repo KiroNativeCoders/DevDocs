@@ -790,7 +790,12 @@ function CollabEditor({
       }
       const start = editor.view.coordsAtPos(from)
       const end = editor.view.coordsAtPos(to)
-      setBubble({ top: start.top - 42, left: (start.left + end.left) / 2 })
+      const rawTop = start.top - 46
+      // Position bubble right above selection, or below if near top of window
+      const top = rawTop < 60 ? end.bottom + 12 : rawTop
+      // Clamp horizontally within viewport
+      const left = Math.max(180, Math.min(window.innerWidth - 180, (start.left + end.left) / 2))
+      setBubble({ top, left })
     },
     editorProps: {
       // Paste an image (e.g. a screenshot) → upload to storage, insert the URL.
@@ -998,6 +1003,17 @@ function CollabEditor({
     return () => scroll.removeEventListener('click', onClick)
   }, [docId, loadPopoverThread])
 
+  // Dismiss floating bubble on scroll so it doesn't get displaced
+  useEffect(() => {
+    const scroll = document.querySelector('.editor-scroll')
+    if (!scroll) return
+    const onScroll = () => {
+      if (bubble) setBubble(null)
+    }
+    scroll.addEventListener('scroll', onScroll, { passive: true })
+    return () => scroll.removeEventListener('scroll', onScroll)
+  }, [bubble])
+
   // Add a reply to the thread shown in the popover. Reopens it if resolved so
   // it reappears in the side panel, then refreshes both views.
   const addPopoverReply = useCallback(async () => {
@@ -1110,8 +1126,10 @@ function CollabEditor({
         return
       }
 
+      const popoverTop = bubble.top + 42
+      const clampedTop = Math.min(window.innerHeight - 440, Math.max(60, popoverTop))
       setAiPopover({
-        top: bubble.top + 34,
+        top: clampedTop,
         left: bubble.left,
         mode,
         selectedText,

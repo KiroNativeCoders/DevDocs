@@ -290,8 +290,8 @@
 
 /* Modern Capsule Floating AI Bubble Toolbar */
 .ai-floating-bubble-bar {
-  position: absolute;
-  z-index: 90;
+  position: fixed;
+  z-index: 9999;
   transform: translateX(-50%);
   /* Light mode (default): white bar. Dark override below for night mode. */
   background: #ffffff;
@@ -381,8 +381,8 @@
 
 /* Popover shown when clicking commented text */
 .comment-popover {
-  position: absolute;
-  z-index: 30;
+  position: fixed;
+  z-index: 9999;
   width: 360px;
   max-width: 92vw;
   background: #fff;

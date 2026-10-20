@@ -54,6 +54,17 @@
   border: none;
   background: #ffffff;
   display: block;
+  pointer-events: none; /* View-only: user cannot edit or modify the webpage canvas inside the document */
+}
+
+.excalidraw-view-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 7px;
+  border-radius: 999px;
+  margin-right: 2px;
 }
 
 /* Floating Controls (Top-Right) */
