@@ -57,11 +57,21 @@ export function resolveEmbed(raw: string): EmbedInfo | null {
       title: 'Figma file',
     }
   }
-
-  // Google Maps — place/embed share links
+  // Google Maps. The /maps/@… and /maps/place/… pages send
+  // X-Frame-Options: sameorigin and REFUSE to be framed. Only two forms embed:
+  //   1. the official /maps/embed iframe URL (Maps → Share → Embed a map)
+  //   2. the keyless  maps?q=<query>&output=embed  form
+  // So accept (1) verbatim, and rebuild (2) from whatever we can extract.
+  if (/\/maps\/embed/i.test(url)) {
+    return { provider: 'googlemaps', src: url, ratio: 4 / 3, title: 'Google Map' }
+  }
   if (/google\.[^/]+\/maps/i.test(url)) {
-    // A full share URL works inside an iframe via the output=embed form.
-    const src = url.includes('output=embed') ? url : `${url}${url.includes('?') ? '&' : '?'}output=embed`
+    // Pull coordinates from /@lat,lng or a place name; fall back to the raw URL as a query.
+    const at = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/)
+    const place = url.match(/\/maps\/place\/([^/@]+)/)
+    const q = at ? `${at[1]},${at[2]}` : place ? decodeURIComponent(place[1]).replace(/\+/g, ' ') : null
+    if (!q) return null // not enough to build a framable embed
+    const src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=14&output=embed`
     return { provider: 'googlemaps', src, ratio: 4 / 3, title: 'Google Map' }
   }
 
