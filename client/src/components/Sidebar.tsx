@@ -32,6 +32,8 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
 
   // Creation & Editing states
   const [creatingParentId, setCreatingParentId] = useState<string | null | undefined>(undefined) // undefined = closed, null = root, string = subfolder
+  const [newMenuOpen, setNewMenuOpen] = useState(false)
+  const newMenuRef = useRef<HTMLDivElement>(null)
   const [newFolderName, setNewFolderName] = useState('')
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
   const [editingFolderName, setEditingFolderName] = useState('')
@@ -87,6 +89,21 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
     window.addEventListener('mousedown', onDocClick)
     return () => window.removeEventListener('mousedown', onDocClick)
   }, [movingDocId])
+
+  // Close the + New dropdown on outside click or Escape.
+  useEffect(() => {
+    if (!newMenuOpen) return
+    const onDown = (e: MouseEvent) => {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) setNewMenuOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNewMenuOpen(false) }
+    window.addEventListener('mousedown', onDown)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('mousedown', onDown)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [newMenuOpen])
 
   async function handleCreateDoc(targetFolderId: string | null = null) {
     try {
@@ -445,25 +462,45 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
       <div className="sidebar-head">
         <span className="sidebar-title">Workspace</span>
         <div className="sidebar-head-actions">
-          <button
-            type="button"
-            className="sidebar-btn-ghost"
-            onClick={() => {
-              setCreatingParentId(null)
-              setNewFolderName('')
-            }}
-            title="Create root folder"
-          >
-            + Folder
-          </button>
-          <button
-            type="button"
-            className="new-doc"
-            onClick={() => handleCreateDoc(null)}
-            title="New document"
-          >
-            + New Doc
-          </button>
+          <div className="new-split" ref={newMenuRef}>
+            <button
+              type="button"
+              className="new-split-main"
+              onClick={() => { setNewMenuOpen(false); handleCreateDoc(null) }}
+              title="New document"
+            >
+              <span className="new-split-plus">+</span>
+              <span className="new-split-label">New</span>
+            </button>
+            <button
+              type="button"
+              className="new-split-caret"
+              onClick={() => setNewMenuOpen((o) => !o)}
+              aria-haspopup="menu"
+              aria-expanded={newMenuOpen}
+              aria-label="More new options"
+            >
+              <span aria-hidden="true">▾</span>
+            </button>
+            {newMenuOpen && (
+              <div className="new-split-menu" role="menu">
+                <button
+                  className="new-split-item"
+                  role="menuitem"
+                  onClick={() => { setNewMenuOpen(false); handleCreateDoc(null) }}
+                >
+                  New document
+                </button>
+                <button
+                  className="new-split-item"
+                  role="menuitem"
+                  onClick={() => { setNewMenuOpen(false); setCreatingParentId(null); setNewFolderName('') }}
+                >
+                  New folder
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
