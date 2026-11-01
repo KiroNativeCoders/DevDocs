@@ -22,6 +22,8 @@ import Menu from './Menu'
 import { CommentMark } from './CommentMark'
 import { MermaidNode } from './Mermaid'
 import { CodeRef } from './CodeRef'
+import { Embed } from './Embed'
+import { SlashCommands } from './SlashCommands'
 import { HtmlPageNode } from './HtmlPage'
 import MermaidModal from './MermaidModal'
 import HtmlPageModal from './HtmlPageModal'
@@ -800,6 +802,8 @@ function CollabEditor({
       CommentMark,
       MermaidNode,
       CodeRef,
+      Embed,
+      SlashCommands,
       HtmlPageNode,
       Image.configure({ inline: false, allowBase64: false }),
       Collaboration.configure({ document: ydoc }),
