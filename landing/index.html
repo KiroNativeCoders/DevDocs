@@ -3,99 +3,919 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DevDocs — open-source collaborative docs</title>
-  <meta name="description" content="DevDocs is an open-source, self-hostable, real-time collaborative document editor. A modern replacement for Quip." />
+  <meta name="theme-color" content="#FFFFFF" />
+  <title>DevDocs: collaborative docs for engineering teams and agents</title>
+  <meta name="description" content="DevDocs is an open source collaborative editor for engineering teams and their agents. Write, comment, and decide in one document with live multiplayer editing, on your own stack." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://devdocs.trailmark.online/" />
+  <meta property="og:title" content="DevDocs: collaborative docs for engineering teams and agents" />
+  <meta property="og:description" content="Write, comment, and decide in one document. Open source, self hostable, and built for technical teams and their agents." />
+  <meta property="og:image" content="https://devdocs.trailmark.online/clips/hero-tour-poster.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="DevDocs: collaborative docs for engineering teams and agents" />
+  <meta name="twitter:description" content="Write, comment, and decide in one document. Open source, self hostable, and built for technical teams and their agents." />
+  <meta name="twitter:image" content="https://devdocs.trailmark.online/clips/hero-tour-poster.jpg" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%23E11E2B'/><text x='16' y='21' font-family='system-ui,sans-serif' font-size='14' font-weight='600' fill='white' text-anchor='middle'>DD</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --blue: #2567f4; --ink: #1f2328; --muted: #6b7177; --line: #e6e6e3; --bg: #faf9f7; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: #fff; line-height: 1.5; }
-    a { color: inherit; text-decoration: none; }
-    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+    :root {
+      color-scheme: light;
+      --bg: #FFFFFF;
+      --ink: #0A0A0A;
+      --muted: #5A5A5A;
+      --dim: #767676;
+      --line: #E5E5E5;
+      --surface: #F5F5F5;
+      --red: #E11E2B;
+      --red-text: #C41622;
+      --red-hover: #C41622;
+      --dark: #000000;
+      --dark-surface: #000000;
+      --dark-line: #000000;
+      --dark-muted: #9B9B9B;
 
-    header { border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(255,255,255,0.92); backdrop-filter: blur(8px); z-index: 10; }
-    .nav { display: flex; align-items: center; gap: 12px; height: 64px; }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
-    .mark { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; }
-    .nav .spacer { flex: 1; }
-    .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; padding: 10px 18px; font-weight: 600; font-size: 15px; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--ink); }
-    .btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
-    .btn.primary:hover { background: #1a56da; }
-    .btn.ghost:hover { background: var(--bg); }
+      --space-25: 2px;
+      --space-50: 4px;
+      --space-75: 8px;
+      --space-100: 12px;
+      --space-200: 16px;
+      --space-300: 24px;
+      --space-400: 32px;
+      --space-500: 40px;
+      --space-600: 48px;
+      --space-700: 64px;
+      --space-800: 80px;
+      --space-900: 96px;
 
-    .hero { text-align: center; padding: 96px 0 72px; }
-    .pill { display: inline-block; font-size: 13px; font-weight: 600; color: var(--blue); background: #e9f0ff; border-radius: 999px; padding: 6px 14px; margin-bottom: 22px; }
-    .hero h1 { font-size: 52px; line-height: 1.08; letter-spacing: -0.02em; margin-bottom: 20px; }
-    .hero p { font-size: 20px; color: var(--muted); max-width: 640px; margin: 0 auto 32px; }
-    .cta { display: flex; gap: 12px; justify-content: center; }
+      --radius-media: 12px;
+      --radius-pill: 999px;
 
-    .section { padding: 56px 0; }
-    .section h2 { font-size: 30px; text-align: center; letter-spacing: -0.01em; margin-bottom: 10px; }
-    .section .sub { text-align: center; color: var(--muted); margin-bottom: 40px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
-    .card { border: 1px solid var(--line); border-radius: 14px; padding: 24px; background: #fff; }
-    .card .ic { font-size: 26px; margin-bottom: 12px; }
-    .card h3 { font-size: 17px; margin-bottom: 6px; }
-    .card p { color: var(--muted); font-size: 14px; }
+      --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      --font-sans: 'Geist', system-ui, sans-serif;
+      --font-mono: 'Geist Mono', ui-monospace, monospace;
+      --nav-h: 72px;
+    }
 
-    .band { background: var(--bg); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-    .band .inner { text-align: center; padding: 72px 0; }
-    .band h2 { font-size: 32px; margin-bottom: 14px; }
-    .band p { color: var(--muted); font-size: 17px; margin-bottom: 28px; }
+    /* Text styles */
+    .heading-1 { font-family: var(--font-sans); font-size: 60px; line-height: 60px; font-weight: 600; margin: 0; }
+    .heading-2 { font-family: var(--font-sans); font-size: 48px; line-height: 48px; font-weight: 600; margin: 0; }
+    .heading-3 { font-family: var(--font-sans); font-size: 36px; line-height: 40px; font-weight: 600; margin: 0; }
+    .heading-4 { font-family: var(--font-sans); font-size: 30px; line-height: 36px; font-weight: 600; margin: 0; }
+    .heading-5 { font-family: var(--font-sans); font-size: 24px; line-height: 32px; font-weight: 600; margin: 0; }
+    .title-1 { font-family: var(--font-sans); font-size: 20px; line-height: 28px; font-weight: 500; margin: 0; }
+    .title-2 { font-family: var(--font-sans); font-size: 18px; line-height: 28px; font-weight: 500; margin: 0; }
+    .title-4 { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 500; margin: 0; }
+    .body-1 { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 600; margin: 0; }
+    .body-3 { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 400; margin: 0; }
+    .body-7 { font-family: var(--font-sans); font-size: 18px; line-height: 28px; font-weight: 400; margin: 0; }
+    .body-6 { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 400; margin: 0; }
+    .button-md { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 600; }
+    .button-sm { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 600; }
+    .caption-2 { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 400; margin: 0; }
+    .caption-4 { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 500; margin: 0; }
 
-    footer { padding: 40px 0; color: var(--muted); font-size: 14px; text-align: center; }
-    footer a { color: var(--blue); }
-    @media (max-width: 640px) { .hero h1 { font-size: 36px; } .hero p { font-size: 17px; } }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: calc(var(--nav-h) + 16px); }
+    body {
+      margin: 0;
+      background: var(--bg);
+      overflow-x: clip;
+      color: var(--ink);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    p { text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+    img, video { max-width: 100%; }
+    ::selection { background: #FFD1D5; color: var(--ink); }
+    a { color: inherit; }
+    :focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+
+    .skip-link {
+      position: fixed;
+      top: -64px;
+      left: var(--space-200);
+      z-index: 100;
+      background: var(--ink);
+      color: #FFFFFF;
+      padding: var(--space-75) var(--space-200);
+      border-radius: var(--radius-pill);
+      text-decoration: none;
+      transition: top 300ms var(--ease);
+    }
+    .skip-link:focus { top: var(--space-200); }
+
+    .page { padding-top: var(--nav-h); }
+    .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 var(--space-400); }
+    section { position: relative; }
+
+    /* Navigation */
+    .site-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 30;
+      background: #FFFFFF;
+      border-bottom: 1px solid var(--line);
+    }
+    .nav {
+      position: relative;
+      max-width: 1280px;
+      margin: 0 auto;
+      height: var(--nav-h);
+      padding: 0 var(--space-400);
+      display: flex;
+      align-items: center;
+      gap: var(--space-400);
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-75);
+      text-decoration: none;
+      margin-right: auto;
+    }
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--red);
+      color: #FFFFFF;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .brand-name { color: var(--ink); }
+    .nav-links {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: var(--space-50);
+    }
+    .nav-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+      padding: var(--space-75) var(--space-100);
+      border-radius: var(--radius-pill);
+      color: var(--ink);
+      text-decoration: none;
+      transition: color 300ms var(--ease), background-color 300ms var(--ease);
+    }
+    .nav-link:hover { background: var(--surface); }
+    .nav-link--red { color: var(--red-text); }
+    .nav-actions { display: flex; align-items: center; gap: var(--space-75); }
+    .nav-github {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-75);
+      min-height: 44px;
+      padding: var(--space-75) var(--space-100);
+      border-radius: var(--radius-pill);
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 300ms var(--ease), background-color 300ms var(--ease);
+    }
+    .nav-github:hover { color: var(--ink); background: var(--surface); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-75);
+      min-height: 44px;
+      padding: var(--space-75) var(--space-200);
+      border: 1px solid transparent;
+      border-radius: var(--radius-pill);
+      text-decoration: none;
+      cursor: pointer;
+      transition: background-color 300ms var(--ease), border-color 300ms var(--ease), color 300ms var(--ease), transform 200ms var(--ease);
+    }
+    .btn svg { flex: none; }
+    .btn:active { transform: scale(0.98); }
+    .btn-dark { background: var(--ink); color: #FFFFFF; }
+    .btn-dark:hover { background: #2A2A2A; }
+    .btn-light { background: #FFFFFF; color: var(--ink); }
+    .btn-light:hover { background: #EDEDED; }
+    .btn-white { background: #FFFFFF; color: var(--ink); }
+    .btn-white:hover { background: #F0F0F0; }
+    .btn-outline { background: transparent; color: var(--ink); border-color: var(--ink); }
+    .btn-outline:hover { background: var(--ink); color: #FFFFFF; }
+
+    /* Hero */
+    .hero {
+      background: #000000;
+      padding: var(--space-900) 0;
+    }
+    .hero-panel {
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 var(--space-400);
+      background: #000000;
+    }
+    .hero-copy { max-width: 680px; width: 100%; }
+    .eyebrow-dark {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-75);
+      color: #FFFFFF;
+    }
+    .eyebrow-dot { width: 6px; height: 6px; background: var(--red); flex: none; }
+    .hero-title {
+      margin-top: var(--space-300);
+      background-image: linear-gradient(90deg, #FFFFFF, #9B9B9B);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      max-width: 680px;
+    }
+    .hero-sub { margin-top: var(--space-300); color: #B3B3B3; max-width: 600px; }
+    .hero-actions { margin-top: var(--space-400); display: flex; align-items: center; gap: var(--space-300); flex-wrap: wrap; }
+    .hero-link { color: #FFFFFF; text-decoration: none; opacity: 0.8; transition: opacity 300ms var(--ease); }
+    .hero-link:hover { opacity: 1; }
+    .hero-proof { margin-top: var(--space-300); color: var(--dark-muted); }
+    .hero-proof span { margin: 0 var(--space-50); }
+
+    /* Tagline band */
+    .tagline-band {
+      background: var(--dark);
+      padding: var(--space-900) 0;
+    }
+    .tagline {
+      max-width: 900px;
+      margin: 0 auto;
+      color: #FFFFFF;
+      text-align: center;
+    }
+    .tagline .word { opacity: 0.26; transition: opacity 500ms var(--ease); }
+    .tagline .word.is-active { opacity: 1; }
+
+    /* Sections */
+    .section { padding: var(--space-900) 0; }
+    .eyebrow-red {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-75);
+      color: var(--red-text);
+      margin-bottom: var(--space-200);
+    }
+    .eyebrow-red::before { content: ''; width: 6px; height: 6px; background: var(--red); flex: none; }
+    .section-head { max-width: 760px; margin-bottom: var(--space-600); }
+    .section-head .heading-2 { margin-top: 0; }
+    .muted { color: var(--muted); }
+
+    /* Light product shot */
+    .light-section { background: #FFFFFF; }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: var(--space-700);
+      align-items: center;
+    }
+    .split-copy .heading-2 { max-width: 520px; }
+    .split-copy .body-7 { margin-top: var(--space-300); max-width: 460px; color: var(--muted); }
+    .split-copy .btn { margin-top: var(--space-400); }
+    .deck-wrap { min-width: 0; }
+    .deck { display: grid; position: relative; max-width: 440px; margin-left: auto; padding-bottom: 210px; }
+    .deck-card {
+      grid-area: 1 / 1;
+      display: block;
+      width: 100%;
+      min-width: 0;
+      padding: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-media);
+      background: #FFFFFF;
+      overflow: hidden;
+      text-align: left;
+      cursor: pointer;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.10);
+      transform-origin: 50% 65%;
+      transition: transform 600ms cubic-bezier(0.2, 0.9, 0.25, 1.08), box-shadow 300ms var(--ease), border-color 300ms var(--ease);
+      will-change: transform;
+    }
+    .deck-card.is-top { cursor: default; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.16); }
+    .deck-card:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+    .deck-shot { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; background: #FFFFFF; }
+    .deck-copy {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: baseline;
+      gap: var(--space-25) var(--space-100);
+      min-height: 84px;
+      padding: var(--space-200) var(--space-300);
+      border-top: 1px solid var(--line);
+    }
+    .slide-icon { grid-row: 1 / span 2; width: 44px; height: 44px; align-self: center; }
+    .deck-title { color: var(--ink); }
+    .deck-desc { grid-column: 2; color: var(--muted); }
+
+    /* Features */
+    .features-head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: var(--space-300);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-600);
+    }
+    .features-head > div { max-width: 760px; }
+
+    .features-section { background: #000000; color: #FFFFFF; }
+    .features-section .container { max-width: 1440px; padding-left: var(--space-600); padding-right: var(--space-600); }
+    .features-section .heading-2 { color: #FFFFFF; }
+    .features-section .eyebrow-red { color: #FF6B73; }
+    .features-section .eyebrow-red::before { background: var(--red); }
+    .tile-new { display: block; color: #FF6B73; margin-bottom: var(--space-75); }
+    .tile-icon { display: block; width: 44px; height: 44px; }
+
+    .feature-rows { display: flex; flex-direction: column; gap: var(--space-800); }
+    .feature-row { display: grid; grid-template-columns: 1fr 1.1fr; gap: var(--space-700); align-items: center; }
+    .feature-row:nth-child(even) .feature-row-copy { order: 2; }
+    .feature-row:nth-child(even) .feature-row-media { order: 1; }
+    .feature-row-copy { display: flex; flex-direction: column; max-width: 560px; }
+    .feature-row-head { display: flex; align-items: center; gap: var(--space-200); }
+    .feature-row-icon { display: block; width: 56px; height: 56px; flex: none; }
+    .feature-row-copy .heading-2 { color: #FFFFFF; }
+    .feature-row-copy .body-3 { color: #FFFFFF; max-width: 520px; margin-top: var(--space-300); }
+    .feature-row-media {
+      border: 1px solid #1D1D1D;
+      border-radius: var(--radius-media);
+      overflow: hidden;
+      background: #0A0A0F;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    }
+    .feature-row-media video { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+    .agent-strip {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      gap: var(--space-400);
+      margin-top: var(--space-500);
+      padding: var(--space-400);
+      background: var(--dark-surface);
+      border: 1px solid var(--dark-line);
+      border-radius: var(--radius-media);
+    }
+    .agent-icon { display: block; width: 44px; height: 44px; }
+    .agent-copy .eyebrow-red { margin-bottom: var(--space-75); }
+    .agent-copy .heading-4 { color: #FFFFFF; margin-bottom: var(--space-75); }
+    .agent-copy .body-3 { color: var(--dark-muted); max-width: 800px; }
+
+    /* Steps */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-300); }
+    .step {
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-media);
+      padding: var(--space-400);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      transition: border-color 300ms var(--ease), box-shadow 300ms var(--ease);
+    }
+    .step:hover { border-color: #CFCFCF; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.08); }
+    .step-icon { display: block; width: 48px; height: 48px; margin-bottom: var(--space-300); }
+    .step .heading-5 { margin-bottom: var(--space-75); }
+    .step .body-3 { color: var(--muted); }
+
+    /* Final CTA */
+    .cta-band { background: var(--red); padding: var(--space-900) 0; text-align: center; }
+    .cta-inner { max-width: 760px; margin: 0 auto; }
+    .cta-band .heading-1 { color: #FFFFFF; }
+    .cta-band .body-7 { margin-top: var(--space-200); color: #FFFFFF; }
+    .cta-band .btn { margin-top: var(--space-400); }
+
+    /* Footer */
+    .footer { padding: var(--space-600) 0; border-top: 1px solid var(--line); background: #FFFFFF; }
+    .footer-inner { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-400); flex-wrap: wrap; }
+    .footer-brand { display: flex; align-items: center; gap: var(--space-75); }
+    .footer-copy { margin-top: var(--space-100); color: var(--dim); max-width: 380px; }
+    .footer-links { display: flex; flex-wrap: wrap; gap: var(--space-200); }
+    .footer-link { color: var(--muted); text-decoration: none; transition: color 300ms var(--ease); }
+    .footer-link:hover { color: var(--ink); }
+    .footer-legal { margin-top: var(--space-400); color: var(--dim); }
+
+    /* Reveal */
+    .reveal { opacity: 0; transform: translateY(var(--space-400)); transition: opacity 700ms var(--ease), transform 700ms var(--ease); }
+    .reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .nav-links { display: none; }
+    }
+    @media (max-width: 860px) {
+      :root { --nav-h: 64px; }
+      .hero { padding: var(--space-700) 0; }
+      .hero-panel { padding: 0 var(--space-300); }
+      .split { grid-template-columns: 1fr; gap: var(--space-500); }
+      .deck { margin-left: auto; margin-right: auto; }
+      .feature-rows { gap: var(--space-600); }
+      .feature-row { grid-template-columns: 1fr; gap: var(--space-300); }
+      .feature-row:nth-child(even) .feature-row-copy,
+      .feature-row:nth-child(even) .feature-row-media { order: initial; }
+      .feature-row-copy { max-width: none; }
+      .feature-row-copy .body-3 { margin-top: var(--space-300); }
+      .feature-row-icon { width: 48px; height: 48px; }
+      .features-section .container { padding-left: var(--space-300); padding-right: var(--space-300); }
+      .nav { padding: 0 var(--space-300); }
+      .nav-github { display: none; }
+      .container { padding: 0 var(--space-300); }
+      .heading-1 { font-size: 36px; line-height: 40px; }
+      .heading-2 { font-size: 30px; line-height: 36px; }
+      .section { padding: var(--space-700) 0; }
+      .tagline-band, .cta-band { padding: var(--space-700) 0; }
+      .footer-link { min-height: 44px; display: inline-flex; align-items: center; }
+    }
+    @media (max-width: 720px) {
+      .agent-strip { grid-template-columns: 1fr; gap: var(--space-200); align-items: start; }
+      .steps { grid-template-columns: 1fr; gap: var(--space-400); }
+      .features-head { align-items: flex-start; }
+    }
+
+    @media print {
+      .site-header { display: none; }
+      .reveal { opacity: 1; transform: none; }
+      .tagline .word { opacity: 1; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+      .reveal { opacity: 1; transform: none; }
+      .tagline .word { opacity: 1; }
+    }
   </style>
+  <noscript>
+    <style>
+      .reveal { opacity: 1 !important; transform: none !important; }
+      .tagline .word { opacity: 1 !important; }
+    </style>
+  </noscript>
 </head>
-<body>
-  <header>
-    <div class="wrap nav">
-      <div class="brand"><span class="mark">DD</span> DevDocs</div>
-      <span class="spacer"></span>
-      <a class="btn ghost" href="https://github.com/KiroAINativeCoder/DXEditor" target="_blank" rel="noopener">GitHub</a>
-      <a class="btn primary" href="//app.devdocs.trailmark.online/">Open the app</a>
-    </div>
-  </header>
+<body id="top">
+  <a class="skip-link caption-2" href="#main">Skip to content</a>
 
-  <main>
-    <section class="hero">
-      <div class="wrap">
-        <span class="pill">Quip is being deprecated. Own your docs instead.</span>
-        <h1>Collaborative docs,<br/>open source and self-hosted.</h1>
-        <p>DevDocs is a real-time collaborative document editor you can run yourself. Write together, comment, diagram, and keep full control of your data.</p>
-        <div class="cta">
-          <a class="btn primary" href="//app.devdocs.trailmark.online/">Get started</a>
-          <a class="btn ghost" href="https://github.com/KiroAINativeCoder/DXEditor" target="_blank" rel="noopener">View on GitHub</a>
+  <div class="page">
+    <header class="site-header">
+      <nav class="nav" aria-label="Main">
+        <a class="brand" href="#top" aria-label="DevDocs home">
+          <span class="brand-mark" aria-hidden="true">DD</span>
+          <span class="brand-name title-2">DevDocs</span>
+        </a>
+        <div class="nav-links">
+          <a class="nav-link title-4" href="#product">Product</a>
+          <a class="nav-link title-4" href="#features">Features</a>
+          <a class="nav-link nav-link--red title-4" href="#features">Diagramify</a>
         </div>
-      </div>
-    </section>
+        <div class="nav-actions">
+          <a class="nav-github title-4" href="https://github.com/KiroAINativeCoder/DXEditor" target="_blank" rel="noopener">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.7-.2.7-.5v-1.8c-2.7.6-3.3-1.3-3.3-1.3-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 0 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.4-2.1-.2-4.4-1.1-4.4-4.8 0-1.1.4-1.9 1-2.6-.1-.2-.4-1.2.1-2.5 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.5.6.7 1 1.5 1 2.6 0 3.7-2.3 4.6-4.4 4.8.3.3.6.9.6 1.8v2.7c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5z" />
+            </svg>
+            <span>Star</span>
+          </a>
+          <a class="btn btn-dark button-sm" href="https://app.devdocs.trailmark.online/">Open app</a>
+        </div>
+      </nav>
+    </header>
 
-    <section class="section wrap">
-      <h2>Everything you expect from a modern doc tool</h2>
-      <p class="sub">Built on Yjs, Tiptap and Supabase. No vendor lock-in.</p>
-      <div class="grid">
-        <div class="card"><div class="ic">👥</div><h3>Real-time collaboration</h3><p>Multiple people editing the same document live, with presence cursors. CRDT-backed, so no lost edits.</p></div>
-        <div class="card"><div class="ic">💬</div><h3>Inline comments</h3><p>Select text, start a thread, reply, and archive when resolved. Click any highlight to reopen the discussion.</p></div>
-        <div class="card"><div class="ic">🕑</div><h3>Version history</h3><p>Snapshot a document and restore any earlier version. A true revert, not just a diff view.</p></div>
-        <div class="card"><div class="ic">🖼️</div><h3>Images</h3><p>Drag, drop or paste screenshots. Stored in object storage so documents stay fast and lightweight.</p></div>
-        <div class="card"><div class="ic">📊</div><h3>Mermaid diagrams</h3><p>Write mermaid syntax and get live-rendered flowcharts, sequence diagrams and more, right in the doc.</p></div>
-        <div class="card"><div class="ic">🔐</div><h3>Sharing & permissions</h3><p>Share by email with view, edit or manage roles, enforced end to end by row-level security.</p></div>
-      </div>
-    </section>
+    <main id="main">
+      <section class="hero">
+        <div class="hero-panel">
+          <div class="hero-copy">
+            <span class="eyebrow-dark caption-4"><span class="eyebrow-dot" aria-hidden="true"></span> Open source collaborative docs</span>
+            <h1 class="heading-1 hero-title">Specs your team and agents write together, in real time.</h1>
+            <p class="body-7 hero-sub">DevDocs is an open source collaborative editor for engineering teams and the agents that work with them. Write, comment, and decide in one document, hosted on your own stack.</p>
+            <div class="hero-actions">
+              <a class="btn btn-light button-md" href="https://app.devdocs.trailmark.online/">
+                Open the workspace
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M7 17L17 7" />
+                  <path d="M8 7h9v9" />
+                </svg>
+              </a>
+              <a class="hero-link title-4" href="#features">See the features</a>
+            </div>
+            <p class="caption-2 hero-proof">Open source <span aria-hidden="true">·</span> MIT license <span aria-hidden="true">·</span> Self hostable</p>
+          </div>
+        </div>
+      </section>
 
-    <section class="band">
-      <div class="inner wrap">
-        <h2>Ready when you are</h2>
-        <p>Sign in and start writing. Your team, your server, your data.</p>
-        <a class="btn primary" href="//app.devdocs.trailmark.online/">Open DevDocs</a>
-      </div>
-    </section>
-  </main>
+      <section class="tagline-band" aria-labelledby="tagline">
+        <div class="container">
+          <h2 id="tagline" class="heading-1 tagline" data-reveal-words>
+            <span class="word">Write</span> <span class="word">the</span> <span class="word">spec</span> <span class="word">together.</span> <span class="word">Decide</span> <span class="word">in</span> <span class="word">the</span> <span class="word">same</span> <span class="word">doc.</span>
+          </h2>
+        </div>
+      </section>
 
-  <footer>
-    <div class="wrap">
-      Open source on <a href="https://github.com/KiroAINativeCoder/DXEditor" target="_blank" rel="noopener">GitHub</a>. Self-hostable. Built as a modern replacement for Quip.
-    </div>
-  </footer>
+      <section id="product" class="section light-section">
+        <div class="container split">
+          <div class="split-copy reveal">
+            <span class="eyebrow-red caption-4">Light mode</span>
+            <h2 class="heading-2">Every feature, in the light.</h2>
+            <a class="btn btn-dark button-md" href="https://app.devdocs.trailmark.online/">
+              Open the workspace
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7 17L17 7" />
+                <path d="M8 7h9v9" />
+              </svg>
+            </a>
+          </div>
+          <div class="deck-wrap reveal">
+            <div class="deck" data-deck role="group" aria-label="Feature screenshots in light mode">
+              <button class="deck-card is-top" type="button" data-index="0" aria-label="Show Live collaboration">
+                <img class="deck-shot" src="images/shot-collab.webp" width="1800" height="1125" alt="DevDocs in light mode with two editors connected and a remote cursor typing." loading="eager" />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-collab.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">Live collaboration</span>
+                  <span class="deck-desc body-6">Two editors, one document.</span>
+                </span>
+              </button>
+              <button class="deck-card" type="button" data-index="1" aria-label="Show Inline comments">
+                <img class="deck-shot" src="images/shot-comments.webp" width="1800" height="1125" alt="A comment thread open on a highlighted sentence in light mode." />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-comments.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">Inline comments</span>
+                  <span class="deck-desc body-6">Threads anchored to the text.</span>
+                </span>
+              </button>
+              <button class="deck-card" type="button" data-index="2" aria-label="Show Checklists">
+                <img class="deck-shot" src="images/shot-checklists.webp" width="1800" height="1125" alt="A checklist being ticked in a light-mode document." />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-checklists.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">Checklists</span>
+                  <span class="deck-desc body-6">Track the rollout inline.</span>
+                </span>
+              </button>
+              <button class="deck-card" type="button" data-index="3" aria-label="Show Code blocks">
+                <img class="deck-shot" src="images/shot-code.webp" width="1800" height="1125" alt="A code block with setup commands in light mode." />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-code.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">Code blocks</span>
+                  <span class="deck-desc body-6">Commands stay formatted.</span>
+                </span>
+              </button>
+              <button class="deck-card" type="button" data-index="4" aria-label="Show Markdown">
+                <img class="deck-shot" src="images/shot-markdown.webp" width="1800" height="1125" alt="The document menu open on Markdown import and export." />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-markdown.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">Markdown</span>
+                  <span class="deck-desc body-6">Import, edit, export.</span>
+                </span>
+              </button>
+              <button class="deck-card" type="button" data-index="5" aria-label="Show AI Buddy">
+                <img class="deck-shot" src="images/shot-ai.webp" width="1800" height="1125" alt="AI Buddy rewriting a sentence with DeepSeek in light mode." />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-ai.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">AI Buddy</span>
+                  <span class="deck-desc body-6">Rewrite with your own model.</span>
+                </span>
+              </button>
+              <button class="deck-card" type="button" data-index="6" aria-label="Show Diagramify">
+                <img class="deck-shot" src="images/shot-diagrams.webp" width="1800" height="1125" alt="Diagramify showing a generated release workflow flowchart." />
+                <span class="deck-copy">
+                  <img class="slide-icon" src="icons/slide-diagrams.svg" width="44" height="44" alt="" />
+                  <span class="deck-title title-1">Diagramify</span>
+                  <span class="deck-desc body-6">A workflow becomes a diagram.</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="section features-section">
+        <div class="container">
+          <header class="features-head reveal">
+            <div>
+              <span class="eyebrow-red caption-4">Features</span>
+              <h2 class="heading-2">One document, from first draft to final call.</h2>
+            </div>
+          </header>
+
+          <div class="feature-rows">
+            <article class="feature-row">
+              <div class="feature-row-copy">
+                <div class="feature-row-head">
+                  <img class="feature-row-icon" src="icons/ai.svg" width="56" height="56" alt="" />
+                  <h3 class="heading-2">AI Buddy on your key</h3>
+                </div>
+                <p class="body-3">Crispify a sentence, bulletize a section, or tabularize data with a model you choose.</p>
+              </div>
+              <div class="feature-row-media">
+                <video class="clip-video" muted loop playsinline preload="metadata" poster="clips/feature-ai-poster.jpg" aria-label="AI Buddy rewriting a long sentence with DeepSeek and replacing it in the document.">
+                  <source src="clips/feature-ai.mp4" type="video/mp4" />
+                </video>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-row-copy">
+                <div class="feature-row-head">
+                  <img class="feature-row-icon" src="icons/comments.svg" width="56" height="56" alt="" />
+                  <h3 class="heading-2">Comments stay with the text</h3>
+                </div>
+                <p class="body-3">Select a sentence, leave a thread, and resolve it when the decision is made.</p>
+              </div>
+              <div class="feature-row-media">
+                <video class="clip-video" muted loop playsinline preload="metadata" poster="clips/feature-comments-poster.jpg" aria-label="A comment thread opening on a highlighted sentence.">
+                  <source src="clips/feature-comments.mp4" type="video/mp4" />
+                </video>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-row-copy">
+                <div class="feature-row-head">
+                  <img class="feature-row-icon" src="icons/checklists.svg" width="56" height="56" alt="" />
+                  <h3 class="heading-2">Checklists keep the rollout moving</h3>
+                </div>
+                <p class="body-3">Tick items inline while the doc stays the source of truth.</p>
+              </div>
+              <div class="feature-row-media">
+                <video class="clip-video" muted loop playsinline preload="metadata" poster="clips/feature-checklists-poster.jpg" aria-label="Checklist items being ticked inside the document.">
+                  <source src="clips/feature-checklists.mp4" type="video/mp4" />
+                </video>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-row-copy">
+                <div class="feature-row-head">
+                  <img class="feature-row-icon" src="icons/code.svg" width="56" height="56" alt="" />
+                  <h3 class="heading-2">Code stays code</h3>
+                </div>
+                <p class="body-3">Drop in commands and snippets in a proper code block.</p>
+              </div>
+              <div class="feature-row-media">
+                <video class="clip-video" muted loop playsinline preload="metadata" poster="clips/feature-code-poster.jpg" aria-label="A code block being inserted and filled with setup commands.">
+                  <source src="clips/feature-code.mp4" type="video/mp4" />
+                </video>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-row-copy">
+                <div class="feature-row-head">
+                  <img class="feature-row-icon" src="icons/markdown.svg" width="56" height="56" alt="" />
+                  <h3 class="heading-2">Markdown in, Markdown out</h3>
+                </div>
+                <p class="body-3">Import a file and export any doc back to Markdown.</p>
+              </div>
+              <div class="feature-row-media">
+                <video class="clip-video" muted loop playsinline preload="metadata" poster="clips/feature-markdown-poster.jpg" aria-label="The document menu showing Markdown import and export.">
+                  <source src="clips/feature-markdown.mp4" type="video/mp4" />
+                </video>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-row-copy">
+                <span class="tile-new caption-4">New</span>
+                <div class="feature-row-head">
+                  <img class="feature-row-icon" src="icons/diagrams.svg" width="56" height="56" alt="" />
+                  <h3 class="heading-2">Diagramify a workflow</h3>
+                </div>
+                <p class="body-3">Select a process and AI turns it into a rendered flowchart you can insert into the doc.</p>
+              </div>
+              <div class="feature-row-media">
+                <video class="clip-video" muted loop playsinline preload="metadata" poster="clips/feature-diagrams-poster.jpg" aria-label="Diagramify turning a workflow paragraph into a rendered flowchart and inserting it into the document.">
+                  <source src="clips/feature-diagrams.mp4" type="video/mp4" />
+                </video>
+              </div>
+            </article>
+          </div>
+
+          <div class="agent-strip">
+            <img class="agent-icon" src="icons/mcp.svg" width="44" height="44" alt="" />
+            <div class="agent-copy">
+              <span class="eyebrow-red caption-4">MCP server</span>
+              <h3 class="heading-4">Agents can work on the same doc.</h3>
+              <p class="body-3">Connect Claude Desktop, Cursor, or any MCP client. The agent can read, search, and append to your documents.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how" class="section">
+        <div class="container">
+          <header class="section-head reveal">
+            <span class="eyebrow-red caption-4">How it works</span>
+            <h2 class="heading-2">Three steps to a shared decision.</h2>
+          </header>
+          <div class="steps">
+            <div class="step reveal">
+              <img class="step-icon" src="icons/step-document.svg" width="48" height="48" alt="" />
+              <h3 class="heading-5">Open a document</h3>
+              <p class="body-3">Start blank or bring in a Markdown file.</p>
+            </div>
+            <div class="step reveal">
+              <img class="step-icon" src="icons/step-team.svg" width="48" height="48" alt="" />
+              <h3 class="heading-5">Invite the team</h3>
+              <p class="body-3">Share with view, edit, or manage access.</p>
+            </div>
+            <div class="step reveal">
+              <img class="step-icon" src="icons/step-decide.svg" width="48" height="48" alt="" />
+              <h3 class="heading-5">Decide in place</h3>
+              <p class="body-3">Comment, resolve, and keep the final spec where it started.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta-band" aria-labelledby="final-cta">
+        <div class="container">
+          <div class="cta-inner reveal">
+            <h2 id="final-cta" class="heading-1">Write the next spec together.</h2>
+            <p class="body-7">Open a document, invite the team, and keep the decision in the doc.</p>
+            <a class="btn btn-white button-md" href="https://app.devdocs.trailmark.online/">
+              Open the workspace
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7 17L17 7" />
+                <path d="M8 7h9v9" />
+              </svg>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <div class="footer-inner">
+          <div>
+            <div class="footer-brand">
+              <span class="brand-mark" aria-hidden="true">DD</span>
+              <span class="body-1">DevDocs</span>
+            </div>
+            <p class="footer-copy body-6">Open source collaborative docs for engineering teams. Built with Yjs, Tiptap, Supabase, and Model Context Protocol.</p>
+          </div>
+          <nav class="footer-links" aria-label="Footer">
+            <a class="footer-link body-6" href="https://app.devdocs.trailmark.online/">Web app</a>
+            <a class="footer-link body-6" href="https://github.com/KiroAINativeCoder/DXEditor" target="_blank" rel="noopener">GitHub</a>
+            <a class="footer-link body-6" href="https://github.com/KiroAINativeCoder/DXEditor/blob/main/LICENSE" target="_blank" rel="noopener">MIT license</a>
+          </nav>
+        </div>
+        <p class="footer-legal caption-2">© 2026 DevDocs. Open source under the MIT license.</p>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // Scroll reveals
+      var revealEls = document.querySelectorAll('.reveal');
+      if (reduceMotion) {
+        revealEls.forEach(function (el) { el.classList.add('is-visible'); });
+      } else if ('IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-visible');
+              observer.unobserve(entry.target);
+            }
+          });
+        }, { threshold: 0.15, rootMargin: '0px 0px -10% 0px' });
+        revealEls.forEach(function (el) { observer.observe(el); });
+      } else {
+        revealEls.forEach(function (el) { el.classList.add('is-visible'); });
+      }
+
+      // Tagline word reveal
+      var words = document.querySelectorAll('[data-reveal-words] .word');
+      if (reduceMotion) {
+        words.forEach(function (word) { word.classList.add('is-active'); });
+      } else if (words.length) {
+        var ticking = false;
+        var updateWords = function () {
+          var base = window.innerHeight * 0.72;
+          var step = 16;
+          words.forEach(function (word, index) {
+            var trigger = base + (words.length - index) * step;
+            if (word.getBoundingClientRect().top < trigger) word.classList.add('is-active');
+          });
+          ticking = false;
+        };
+        window.addEventListener('scroll', function () {
+          if (!ticking) {
+            ticking = true;
+            window.requestAnimationFrame(updateWords);
+          }
+        }, { passive: true });
+        updateWords();
+      }
+
+      // Stacked screenshot deck: click a card to pull it out and put it on top.
+      var deck = document.querySelector('[data-deck]');
+      if (deck) {
+        var cards = Array.prototype.slice.call(deck.querySelectorAll('.deck-card'));
+        var order = cards.map(function (_, i) { return i; });
+        var angles = [-3, -4, -5, -6, -7, -8];
+        var xs = [-2, -4, -6, -8, -10, -12];
+
+        function layout() {
+          var narrow = window.innerWidth < 720;
+          var xf = narrow ? 0.35 : 1;
+          var af = narrow ? 0.4 : 1;
+          order.forEach(function (cardIndex, pos) {
+            var card = cards[cardIndex];
+            var top = pos === 0;
+            card.classList.toggle('is-top', top);
+            card.setAttribute('aria-current', top ? 'true' : 'false');
+            if (top) {
+              card.style.transform = 'translate(0, 0) rotate(0deg) scale(1)';
+              card.style.zIndex = '70';
+            } else {
+              var i = pos - 1;
+              var x = xs[i] * xf;
+              var y = 60 + (pos - 1) * 25;
+              var a = angles[i] * af;
+              card.style.transform = 'translate(' + x + 'px, ' + y + 'px) rotate(' + a + 'deg)';
+              card.style.zIndex = String(70 - pos * 5);
+            }
+          });
+        }
+
+        layout();
+        window.addEventListener('resize', layout);
+
+        cards.forEach(function (card) {
+          card.addEventListener('click', function () {
+            if (deck.dataset.busy === '1') return;
+            var index = Number(card.getAttribute('data-index'));
+            var pos = order.indexOf(index);
+            if (pos <= 0) return;
+            deck.dataset.busy = '1';
+
+            var oldTopIndex = order[0];
+            var oldTop = cards[oldTopIndex];
+            var cardWidth = card.getBoundingClientRect().width;
+            var flyX = -(cardWidth + 24);
+
+            card.style.zIndex = '300';
+            card.style.transition = 'transform 300ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms';
+            card.style.transform = 'translate(-40px, -30px) rotate(-6deg) scale(1.03)';
+
+            oldTop.style.zIndex = '250';
+            oldTop.style.transition = 'transform 420ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 420ms';
+            oldTop.style.transform = 'translate(' + flyX + 'px, 30px) rotate(-16deg) scale(1.03)';
+
+            window.setTimeout(function () {
+              order.splice(pos, 1);
+              order.splice(0, 1);
+              order.unshift(index);
+              order.push(oldTopIndex);
+              card.style.transition = '';
+              oldTop.style.transition = 'transform 800ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms';
+              layout();
+              window.setTimeout(function () {
+                oldTop.style.transition = '';
+                delete deck.dataset.busy;
+              }, 840);
+            }, 420);
+          });
+        });
+      }
+
+      // Feature clips: autoplay in view, paused offscreen, off under reduced motion.
+      var clipVideos = Array.prototype.slice.call(document.querySelectorAll('.clip-video'));
+      if (clipVideos.length && !reduceMotion) {
+        if ('IntersectionObserver' in window) {
+          var clipObserver = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                var attempt = entry.target.play();
+                if (attempt && attempt.catch) attempt.catch(function () {});
+              } else {
+                entry.target.pause();
+              }
+            });
+          }, { threshold: 0.25 });
+          clipVideos.forEach(function (clip) { clipObserver.observe(clip); });
+        } else {
+          clipVideos.forEach(function (clip) {
+            var attempt = clip.play();
+            if (attempt && attempt.catch) attempt.catch(function () {});
+          });
+        }
+      }
+    })();
+  </script>
 </body>
 </html>
