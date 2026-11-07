@@ -1,0 +1,58 @@
+.slash-menu {
+  width: 260px;
+  max-height: 380px;
+  overflow-y: auto;
+  background: #1f2328;
+  color: #e6e6e3;
+  border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  font-size: 13px;
+}
+.slash-empty { padding: 10px; color: #9ca3af; }
+.slash-filter-hint {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  padding: 4px 8px 4px;
+}
+.slash-group + .slash-group { margin-top: 2px; }
+.slash-group-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a8f96;
+  padding: 4px 8px 1px;
+}
+.slash-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  color: inherit;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.slash-item.is-active { background: #2563eb; }
+.slash-item.is-active .slash-item-hint { color: #d6e2ff; }
+.slash-item-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.slash-item-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.slash-item-title { font-weight: 600; font-size: 13px; }
+.slash-item-hint { font-size: 10.5px; color: #9ca3af; }
