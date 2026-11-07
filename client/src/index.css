@@ -40,7 +40,6 @@ body {
 
 [data-theme="dark"] .app-header {
   background: #161b22;
-  border-bottom-color: #30363d;
 }
 
 [data-theme="dark"] .brand-name {
@@ -85,6 +84,10 @@ body {
 [data-theme="dark"] .theme-toggle-btn:hover {
   background: #30363d;
 }
+
+[data-theme="dark"] .user-menu-appearance { border-bottom-color: #30363d; }
+[data-theme="dark"] .uma-seg { background: #21262d; }
+[data-theme="dark"] .uma-seg-btn.is-active { background: #30363d; box-shadow: none; }
 
 /* Sidebar */
 [data-theme="dark"] .sidebar {
@@ -269,10 +272,31 @@ body {
 }
 
 [data-theme="dark"] .editor-content {
-  background: #161b22;
-  border-color: #30363d;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
+
+[data-theme="dark"] .editor-shell,
+[data-theme="dark"] .editor-scroll {
+  background: #0d1117;
+}
+
+[data-theme="dark"] .app-subbar {
+  background: #161b22;
+  border-bottom-color: #30363d;
+}
+
+[data-theme="dark"] .app-sidebar {
+  border-right-color: #30363d;
+}
+
+[data-theme="dark"] .header-icon-btn,
+[data-theme="dark"] .sidebar-collapse-btn { color: #8b949e; }
+[data-theme="dark"] .header-icon-btn:hover,
+[data-theme="dark"] .sidebar-collapse-btn:hover { background: #21262d; color: #f0f6fc; }
+[data-theme="dark"] .header-search:focus-within { background: #21262d; }
+[data-theme="dark"] .header-search-input { color: #f0f6fc; }
 
 [data-theme="dark"] .editor-content .ProseMirror {
   color: #c9d1d9;
@@ -777,3 +801,15 @@ body {
 }
 
 
+
+[data-theme="dark"] .comments-fab { color: #8b949e; }
+[data-theme="dark"] .comments-fab:hover { background: #21262d; color: #f0f6fc; }
+[data-theme="dark"] .comments-fab.is-active { color: #58a6ff; background: #15233f; }
+
+[data-theme="dark"] .thread.is-resolved { background: #0f141c; }
+[data-theme="dark"] .thread.is-resolved .thread-anchor { background: #161b22; color: #6e7681; }
+
+[data-theme="dark"] .ai-bubble-fmt.is-active { background: rgba(88, 166, 255, 0.22); color: #9ecbff; }
+
+[data-theme="dark"] .invite-people-link { color: #9aa0a6; }
+[data-theme="dark"] .invite-people-link:hover { background: #21262d; color: #f0f6fc; }

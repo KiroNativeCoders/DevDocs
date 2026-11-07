@@ -15,14 +15,39 @@ import {
 } from '../lib/folders'
 import './Sidebar.css'
 
+// Modern line-style icons (replace the emoji folder/doc markers).
+function FolderIcon({ open }: { open?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {open ? (
+        <path d="M3 8a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H6l-2 7a1 1 0 0 1-1-1V8z" />
+      ) : (
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+      )}
+    </svg>
+  )
+}
+function DocIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5" />
+    </svg>
+  )
+}
+
 type Props = {
   selectedId: string | null
   onSelect: (id: string) => void
   /** Bumped by the editor when it renames/updates the open doc, to refresh. */
   refreshKey: number
+  /** Top-bar search text; filters docs by title (and expands matching folders). */
+  query?: string
+  /** Collapse the whole sidebar panel. */
+  onCollapse?: () => void
 }
 
-export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
+export default function Sidebar({ selectedId, onSelect, refreshKey, query, onCollapse }: Props) {
   const [items, setItems] = useState<DocMeta[]>([])
   const [folders, setFolders] = useState<Folder[]>([])
   const [docFolders, setDocFolders] = useState<Record<string, string>>({})
@@ -222,13 +247,31 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
   }
 
   // Organize documents by folders
+  const q = (query ?? '').trim().toLowerCase()
+  const visibleItems = q
+    ? items.filter((d) => (d.title || 'Untitled document').toLowerCase().includes(q))
+    : items
+  // While searching, show only folders (and their ancestors) that contain a match.
+  const matchedFolderIds = new Set<string>()
+  if (q) {
+    visibleItems.forEach((d) => {
+      let fId: string | undefined = docFolders[d.id]
+      while (fId && !matchedFolderIds.has(fId)) {
+        matchedFolderIds.add(fId)
+        const cur: string = fId
+        fId = folders.find((f) => f.id === cur)?.parentId ?? undefined
+      }
+    })
+  }
+  const treeFolders = q ? folders.filter((f) => matchedFolderIds.has(f.id)) : folders
+
   const folderDocsMap: Record<string, DocMeta[]> = {}
-  folders.forEach((f) => {
+  treeFolders.forEach((f) => {
     folderDocsMap[f.id] = []
   })
   const unfiledDocs: DocMeta[] = []
 
-  items.forEach((item) => {
+  visibleItems.forEach((item) => {
     const fId = docFolders[item.id]
     if (fId && folderDocsMap[fId]) {
       folderDocsMap[fId].push(item)
@@ -241,7 +284,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
   const folderChildrenMap: Record<string, Folder[]> = {}
   const rootFolders: Folder[] = []
 
-  folders.forEach((f) => {
+  treeFolders.forEach((f) => {
     if (f.parentId) {
       if (!folderChildrenMap[f.parentId]) folderChildrenMap[f.parentId] = []
       folderChildrenMap[f.parentId].push(f)
@@ -252,7 +295,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
 
   // Recursive folder node renderer
   function renderFolderNode(folder: Folder, depth = 0) {
-    const isCollapsed = collapsedIds.has(folder.id)
+    const isCollapsed = !q && collapsedIds.has(folder.id)
     const docList = folderDocsMap[folder.id] || []
     const subfolders = folderChildrenMap[folder.id] || []
     const isDragOver = dragOverFolderId === folder.id
@@ -282,7 +325,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
           >
             {isCollapsed ? '▸' : '▾'}
           </button>
-          <span className="folder-icon">{isCollapsed ? '📁' : '📂'}</span>
+          <span className="folder-icon"><FolderIcon open={!isCollapsed} /></span>
 
           {editingFolderId === folder.id ? (
             <input
@@ -419,7 +462,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
                     }`}
                     onClick={() => onSelect(d.id)}
                   >
-                    <span className="doc-icon">📄</span>
+                    <span className="doc-icon"><DocIcon /></span>
                     <div className="doc-item-main">
                       <span className="doc-item-title">{d.title || 'Untitled document'}</span>
                       {d.status && d.status !== 'DRAFT' && (
@@ -501,6 +544,17 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
               </div>
             )}
           </div>
+          {onCollapse && (
+            <button
+              type="button"
+              className="sidebar-collapse-btn"
+              onClick={onCollapse}
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
+            >
+              «
+            </button>
+          )}
         </div>
       </div>
 
@@ -592,7 +646,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
                 }`}
                 onClick={() => onSelect(d.id)}
               >
-                <span className="doc-icon">📄</span>
+                <span className="doc-icon"><DocIcon /></span>
                 <div className="doc-item-main">
                   <span className="doc-item-title">{d.title || 'Untitled document'}</span>
                   {d.status && d.status !== 'DRAFT' && (
@@ -626,6 +680,9 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
             {!loading && !error && items.length === 0 && (
               <li className="sidebar-empty">No documents yet. Create one.</li>
             )}
+            {!loading && !error && q && visibleItems.length === 0 && (
+              <li className="sidebar-empty">No matches for “{query}”.</li>
+            )}
           </ul>
         </div>
       </div>
@@ -645,7 +702,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
               className={`move-popover-item ${!docFolders[movingDocId] ? 'is-active' : ''}`}
               onClick={() => handleMoveDoc(movingDocId, null)}
             >
-              <span className="move-item-icon">📄</span>
+              <span className="move-item-icon"><DocIcon /></span>
               <span className="move-item-name">Unfiled (No folder)</span>
               {!docFolders[movingDocId] && <span className="move-item-check">✓</span>}
             </button>
@@ -661,7 +718,7 @@ export default function Sidebar({ selectedId, onSelect, refreshKey }: Props) {
                   onClick={() => handleMoveDoc(movingDocId, f.id)}
                   title={fullPath}
                 >
-                  <span className="move-item-icon">📁</span>
+                  <span className="move-item-icon"><FolderIcon /></span>
                   <span className="move-item-name">{fullPath || f.name}</span>
                   {isCurrent && <span className="move-item-check">✓</span>}
                 </button>

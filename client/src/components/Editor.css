@@ -2,11 +2,12 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f7f7f5;
+  background: #fff;
 }
 
 .editor-topbar {
-  display: flex;
+  display: none; /* controls are portaled into the app top bar / sub-bar */
+  flex-direction: row;
   align-items: flex-start;
   gap: 10px;
   padding: 10px 16px 8px 24px;
@@ -200,8 +201,8 @@
 }
 
 .comments-btn {
-  border: 1px solid #e6e6e3;
-  background: #fff;
+  border: 1px solid transparent;
+  background: transparent;
   border-radius: 7px;
   padding: 6px 12px;
   font-size: 13px;
@@ -217,9 +218,33 @@
   flex: 1;
   min-height: 0;
   display: flex;
+  position: relative;
 }
+.editor-fab-row {
+  position: absolute;
+  top: 10px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  gap: 2px;
+}
+.comments-fab {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.comments-fab:hover { background: #f1f1ef; color: #1f2328; }
+.comments-fab.is-active { color: #2567f4; background: #eef3ff; }
 
 .editor-scroll {
+  background: #fff;
   flex: 1;
   position: relative; /* anchor for the floating comment bubble */
   overflow-y: auto;
@@ -228,7 +253,7 @@
 
 /* Top spacing for the page content lives below the sticky toolbar. */
 .editor-scroll .editor-content {
-  margin-top: 40px;
+  margin-top: 24px;
 }
 
 /* Document font options (Quip-style). Applied to the editor content. */
@@ -294,15 +319,13 @@
   position: fixed;
   z-index: 9999;
   transform: translateX(-50%);
-  /* Light mode (default): white bar. Dark override below for night mode. */
-  background: #ffffff;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  color: #1f2328;
-  border-radius: 9999px;
-  border: 1px solid #e6e6e3;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.08);
-  padding: 4px;
+  /* Dark pill, matching the Nuclino selection toolbar. */
+  background: #2b2f36;
+  color: #d7dae0;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  padding: 3px;
   display: flex;
   align-items: center;
   gap: 3px;
@@ -316,22 +339,22 @@
 
 .ai-bubble-btn {
   background: transparent;
-  color: #3a3f45;
+  color: #d7dae0;
   border: none;
-  padding: 6px 12px;
-  border-radius: 9999px;
-  font-size: 12.5px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease;
   white-space: nowrap;
 }
 .ai-bubble-btn:hover {
-  background: #f0efec;
-  color: #1f2328;
+  background: rgba(255, 255, 255, 0.10);
+  color: #f4634e;
 }
 .ai-bubble-btn--ai {
   font-weight: 600;
@@ -368,9 +391,9 @@
 
 .ai-bubble-divider {
   width: 1px;
-  height: 16px;
-  background: #e2e0db;
-  margin: 0 2px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.18);
+  margin: 0 3px;
 }
 [data-theme="dark"] .ai-bubble-divider { background: rgba(255, 255, 255, 0.2); }
 
@@ -394,6 +417,16 @@
   overflow: hidden;
 }
 .comment-popover-empty { color: #8a8f96; font-size: 13px; padding: 16px; }
+
+/* Right-side rail: pin comment cards to the right margin (Nuclino-style)
+   instead of floating over the text. Vertical position still follows the
+   commented line; horizontal is fixed to the right edge. */
+.comment-popover.is-rail {
+  right: 20px;
+  left: auto !important;
+  width: 300px;
+  max-width: calc(100vw - 40px);
+}
 
 /* Header: Archive (left) · Comments (center) · Close (right) */
 .cp-head {
@@ -568,11 +601,11 @@
 .editor-content {
   max-width: 760px;
   margin: 0 auto;
-  background: #fff;
-  border: 1px solid #e6e6e3;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  padding: 56px 72px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 32px;
 }
 
 /* ProseMirror surface */
@@ -861,3 +894,103 @@
 .status-menu-item.is-current {
   font-weight: 600;
 }
+
+/* Formatting buttons inside the selection bubble (B / I / U / S / <>) */
+.ai-bubble-fmt {
+  min-width: 30px;
+  justify-content: center;
+  padding: 6px 7px;
+  font-size: 13px;
+}
+.ai-bubble-fmt.is-active { background: rgba(255, 255, 255, 0.14); color: #f4634e; }
+
+
+/* Sparkle AI button + flyout inside the selection bubble */
+.ai-bubble-sparkle-wrap { position: relative; display: inline-flex; }
+.ai-bubble-flyout {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 140px;
+  background: #2b2f36;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  z-index: 10000;
+}
+.ai-flyout-item {
+  background: transparent;
+  border: none;
+  color: #d7dae0;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-flyout-item:hover { background: rgba(255, 255, 255, 0.10); color: #f4634e; }
+
+/* Sidekick (AI) card — opened from the bubble's sparkle, styled per the reference */
+.sidekick-card {
+  position: fixed;
+  z-index: 9999;
+  width: 420px;
+  max-width: 92vw;
+  background: #ffffff;
+  border: 1px solid #e6e6e3;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+}
+.sidekick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0efec;
+}
+.sidekick-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #8a8f96;
+}
+.sidekick-close { border: none; background: none; color: #8a8f96; cursor: pointer; font-size: 13px; }
+.sidekick-body { display: flex; align-items: center; gap: 12px; padding: 14px; }
+.sidekick-mode {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2328;
+  background: #f1f1ef;
+  border: none;
+  border-radius: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.sidekick-hint { font-size: 12px; color: #9aa0a6; }
+.sidekick-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 14px;
+  border-top: 1px solid #f0efec;
+}
+.sidekick-send {
+  background: none;
+  border: none;
+  color: #f4634e;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.sidekick-send:hover { color: #e24a34; }
+
+[data-theme="dark"] .sidekick-card { background: #161b22; border-color: #30363d; }
+[data-theme="dark"] .sidekick-head, [data-theme="dark"] .sidekick-foot { border-color: #30363d; }
+[data-theme="dark"] .sidekick-mode { background: #21262d; color: #f0f6fc; }

@@ -46,7 +46,6 @@ const SlashMenu = forwardRef<SlashMenuRef, Props>(({ items, command }, ref) => {
       <div className="slash-filter-hint">Type to filter…</div>
       {groups.map((g) => (
         <div key={g} className="slash-group">
-          <div className="slash-group-label">{g}</div>
           {items.filter((i) => i.group === g).map((item) => {
             idx += 1
             const myIdx = idx
@@ -58,11 +57,8 @@ const SlashMenu = forwardRef<SlashMenuRef, Props>(({ items, command }, ref) => {
                 onMouseEnter={() => setActive(myIdx)}
                 onMouseDown={(e) => { e.preventDefault(); command(item) }}
               >
-                <span className="slash-item-icon" style={{ background: item.color }}>{item.icon}</span>
-                <span className="slash-item-text">
-                  <span className="slash-item-title">{item.title}</span>
-                  <span className="slash-item-hint">{item.hint}</span>
-                </span>
+                <span className="slash-item-icon">{item.icon}</span>
+                <span className="slash-item-title">{item.title}</span>
               </button>
             )
           })}

@@ -277,7 +277,9 @@
 }
 
 .folder-icon {
-  font-size: 13.5px;
+  display: inline-flex;
+  align-items: center;
+  color: #e8912d;
 }
 
 .folder-name {
@@ -395,8 +397,9 @@
 }
 
 .doc-icon {
-  font-size: 13px;
-  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  color: #6b7280;
 }
 
 .doc-item-title {

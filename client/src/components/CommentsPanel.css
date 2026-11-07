@@ -19,8 +19,7 @@
   background: #fbfbfa;
 }
 .comments-title { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #8a8f96; }
-.comments-toggle { margin-left: auto; font-size: 11px; color: #8a8f96; display: flex; align-items: center; gap: 4px; }
-.comments-close { border: none; background: none; color: #8a8f96; cursor: pointer; font-size: 13px; }
+.comments-close { margin-left: auto; border: none; background: none; color: #8a8f96; cursor: pointer; font-size: 13px; }
 
 .comments-empty { padding: 16px 14px; color: #8a8f96; font-size: 13px; line-height: 1.6; }
 
@@ -33,7 +32,17 @@
   padding: 10px;
   margin-bottom: 10px;
 }
-.thread.is-resolved { opacity: 0.6; }
+.thread.is-resolved { opacity: 0.55; filter: grayscale(0.7); background: #f6f6f5; }
+.thread.is-resolved .thread-anchor { background: #efefed; color: #8a8f96; }
+.thread-resolved-tag {
+  display: inline-block;
+  margin: 6px 0 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #16a34a;
+}
 
 .thread-anchor {
   display: block;

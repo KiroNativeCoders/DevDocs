@@ -24,6 +24,11 @@ function apply(editor: Editor, range: Range, fn: (c: ReturnType<Editor['chain']>
 }
 
 export const SLASH_ITEMS: SlashItem[] = [
+  { title: 'Sidekick (AI)', hint: 'Rewrite with AI', group: 'AI', keywords: 'ai sidekick buddy rewrite crispify bulletize assistant', icon: '✦', color: '#4f8cff',
+    run: (e, r) => {
+      e.chain().focus().deleteRange(r).run()
+      window.dispatchEvent(new CustomEvent('dx-open-ai', { detail: 'sentence' }))
+    } },
   { title: 'Heading 1', hint: 'Big section title', group: 'Basic', keywords: 'h1 title heading', icon: 'H1', color: '#64748b',
     run: (e, r) => apply(e, r, (c) => c.setHeading({ level: 1 })) },
   { title: 'Heading 2', hint: 'Medium heading', group: 'Basic', keywords: 'h2 heading subtitle', icon: 'H2', color: '#64748b',

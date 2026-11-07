@@ -24,6 +24,13 @@ function idFromPath(): string | null {
   return m ? decodeURIComponent(m[1]) : null
 }
 
+function userInitials(name: string | null | undefined, email: string): string {
+  const source = (name && name.trim()) || email.split('@')[0] || '?'
+  const parts = source.split(/[\s._-]+/).filter(Boolean)
+  const letters = parts.length >= 2 ? parts[0][0] + parts[1][0] : source.slice(0, 2)
+  return letters.toUpperCase()
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
@@ -42,8 +49,15 @@ export default function App() {
   const [detail, setDetail] = useState<DocDetail | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [sharing, setSharing] = useState(false)
-  const [navHover, setNavHover] = useState(false)
-  const [navPinned, setNavPinned] = useState(false)
+  const [navCollapsed, setNavCollapsed] = useState<boolean>(() => localStorage.getItem('dx_nav_collapsed') === '1')
+  useEffect(() => {
+    localStorage.setItem('dx_nav_collapsed', navCollapsed ? '1' : '0')
+  }, [navCollapsed])
+  const [search, setSearch] = useState('')
+  // Elements in the shell that the Editor portals its controls into.
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
+  const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null)
+  const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
   const [connectOpen, setConnectOpen] = useState(false)
@@ -170,37 +184,100 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
+        <button
+          type="button"
+          className="header-icon-btn"
+          onClick={() => setNavCollapsed((c) => !c)}
+          title={navCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          aria-label="Toggle sidebar"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <line x1="4" y1="7" x2="20" y2="7" />
+            <line x1="4" y1="12" x2="20" y2="12" />
+            <line x1="4" y1="17" x2="20" y2="17" />
+          </svg>
+        </button>
         <div className="brand" onClick={() => navigate(null)} style={{ cursor: 'pointer' }} title="Home">
           <span className="brand-mark">DD</span>
           <span className="brand-name">DevDocs</span>
         </div>
+        <div className="header-search">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="header-search-input"
+            placeholder="Search documents"
+            aria-label="Search documents"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              if (e.target.value) setNavCollapsed(false)
+            }}
+          />
+          {search && (
+            <button type="button" className="header-search-clear" onClick={() => setSearch('')} aria-label="Clear search">
+              ✕
+            </button>
+          )}
+        </div>
         {detail && detail.role !== 'OWNER' && (
           <span className="role-badge">{roleLabel}</span>
         )}
-        <div className="header-user">
-          <button
-            type="button"
-            className="theme-toggle-btn"
-            onClick={() => setTheme((t) => (t === 'light' ? 'dark' : 'light'))}
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label="Toggle theme"
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
+        {/* The open document's status / versions / comments controls render here. */}
+        <div className="header-actions" ref={setActionsSlot} />
+        {canShare && (
+          <button className="invite-people-link" onClick={() => setSharing(true)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ marginRight: 6, verticalAlign: '-2px' }}>
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <line x1="19" y1="8" x2="19" y2="14" />
+              <line x1="22" y1="11" x2="16" y2="11" />
+            </svg>
+            Invite People
           </button>
+        )}
+        <div className="header-user">
           <div className="user-menu" ref={userMenuRef}>
             <button
               type="button"
-              className="user-menu-trigger"
+              className="user-avatar-btn"
               onClick={() => setUserMenuOpen((o) => !o)}
               aria-haspopup="menu"
               aria-expanded={userMenuOpen}
+              title={user.name || user.email}
             >
-              <span className="user-email">{user.name || user.email}</span>
-              <span className="user-menu-caret" aria-hidden="true">▾</span>
+              {userInitials(user.name, user.email)}
             </button>
             {userMenuOpen && (
               <div className="user-menu-dropdown" role="menu">
                 <div className="user-menu-email" title={user.email}>{user.email}</div>
+                <div className="user-menu-appearance">
+                  <span className="uma-label">Appearance</span>
+                  <div className="uma-seg">
+                    <button
+                      type="button"
+                      className={`uma-seg-btn${theme === 'light' ? ' is-active' : ''}`}
+                      onClick={() => setTheme('light')}
+                      title="Light mode"
+                      aria-label="Light mode"
+                      aria-pressed={theme === 'light'}
+                    >
+                      ☀️
+                    </button>
+                    <button
+                      type="button"
+                      className={`uma-seg-btn${theme === 'dark' ? ' is-active' : ''}`}
+                      onClick={() => setTheme('dark')}
+                      title="Dark mode"
+                      aria-label="Dark mode"
+                      aria-pressed={theme === 'dark'}
+                    >
+                      🌙
+                    </button>
+                  </div>
+                </div>
                 <button
                   className="user-menu-item"
                   role="menuitem"
@@ -215,26 +292,27 @@ export default function App() {
                 >
                   Log out
                 </button>
+                {selectedId && detail && (
+                  <div className="user-menu-status" ref={setStatusSlot} />
+                )}
               </div>
             )}
           </div>
-          {canShare && (
-            <button className="header-btn share-primary" onClick={() => setSharing(true)}>
-              Share
-            </button>
-          )}
         </div>
       </header>
+      {selectedId && detail && (
+        <div className="app-subbar">
+          <div className="app-subbar-menus" ref={setMenuSlot} />
+        </div>
+      )}
       <div className="app-body">
-        <div
-          className={`sidebar-dock${navPinned || navHover ? ' open' : ''}`}
-          onMouseEnter={() => setNavHover(true)}
-          onMouseLeave={() => setNavHover(false)}
-        >
+        <div className={`app-sidebar${navCollapsed ? ' is-collapsed' : ''}`}>
           <Sidebar
             selectedId={selectedId}
             onSelect={(id) => navigate(id || null)}
             refreshKey={refreshKey}
+            query={search}
+            onCollapse={() => setNavCollapsed(true)}
           />
         </div>
         <main className="app-main">
@@ -247,9 +325,9 @@ export default function App() {
               role={detail.role}
               currentUserId={user.id}
               onTitleSaved={() => setRefreshKey((k) => k + 1)}
-              navOpen={navPinned}
-              onRevealNav={() => setNavHover(true)}
-              onToggleNav={() => setNavPinned((p) => !p)}
+              actionsSlot={actionsSlot}
+              menuSlot={menuSlot}
+              statusSlot={statusSlot}
             />
           ) : (
             <Home

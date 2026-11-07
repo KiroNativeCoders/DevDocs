@@ -37,9 +37,6 @@ export default function CommentsPanel({
   const [replyFor, setReplyFor] = useState<string | null>(null)
   const [replyText, setReplyText] = useState('')
   const itemRefs = useRef<Record<string, HTMLLIElement | null>>({})
-  // Show resolved by default: resolving removes the document highlight but the
-  // thread must remain visible here.
-  const [showResolved, setShowResolved] = useState(true)
 
   async function load() {
     const t = await commentsApi.list(docId)
@@ -80,20 +77,12 @@ export default function CommentsPanel({
     await load()
   }
 
-  const visible = threads.filter((t) => showResolved || !t.resolved)
+  const visible = threads
 
   return (
     <aside className="comments-panel">
       <div className="comments-head">
         <span className="comments-title">Comments</span>
-        <label className="comments-toggle">
-          <input
-            type="checkbox"
-            checked={showResolved}
-            onChange={(e) => setShowResolved(e.target.checked)}
-          />
-          Show resolved
-        </label>
         <button className="comments-close" onClick={onClose} aria-label="Close">✕</button>
       </div>
 
@@ -113,6 +102,7 @@ export default function CommentsPanel({
             <button className="thread-anchor" onClick={() => onFocusAnchor(t.anchor_id)}>
               {t.quote ? `“${t.quote}”` : 'Comment'}
             </button>
+            {t.resolved && <span className="thread-resolved-tag">Resolved</span>}
 
             <Entry name={t.author?.name || t.author?.email || 'Unknown user'} when={when(t.created_at)} body={t.body}
               canDelete={canEdit && (t.author?.id === currentUserId)}

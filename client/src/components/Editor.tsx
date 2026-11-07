@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useEditor, EditorContent, type Editor as TiptapEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { CodeBlock } from '@tiptap/extension-code-block'
@@ -15,7 +16,6 @@ import Collaboration from '@tiptap/extension-collaboration'
 import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
-import Toolbar from './Toolbar'
 import CommentsPanel from './CommentsPanel'
 import VersionPanel from './VersionPanel'
 import Menu from './Menu'
@@ -33,8 +33,8 @@ import { accessToken } from '../lib/supabase'
 import { makeIdentity, type Identity } from '../lib/identity'
 import AiSettingsModal from './AiSettingsModal'
 import AiRewritePopover from './AiRewritePopover'
-import GeminiSparkleIcon from './GeminiSparkleIcon'
 import { type AiMode, sanitizeTableHtml, getAiConfig } from '../lib/ai'
+import GeminiSparkleIcon from './GeminiSparkleIcon'
 import ReviewBar from './ReviewBar'
 import { statusMeta, DOC_STATUSES } from '../lib/rfc'
 import { docToMarkdown, markdownToDoc } from '../lib/markdown'
@@ -101,12 +101,18 @@ type Props = {
   role: Role
   currentUserId: string
   onTitleSaved: () => void
-  navOpen?: boolean
-  onRevealNav?: () => void
-  onToggleNav?: () => void
+  /** DOM slots in the app's top bar / sub-bar that this editor portals its controls into. */
+  actionsSlot?: HTMLElement | null
+  menuSlot?: HTMLElement | null
+  statusSlot?: HTMLElement | null
 }
 
-export default function Editor({ docId, initialTitle, initialStatus, role, currentUserId, onTitleSaved, navOpen, onRevealNav, onToggleNav }: Props) {
+// Render `node` into a shell slot when it exists, otherwise inline (fallback).
+function inSlot(slot: HTMLElement | null | undefined, node: React.ReactNode) {
+  return slot ? createPortal(node, slot) : node
+}
+
+export default function Editor({ docId, initialTitle, initialStatus, role, currentUserId, onTitleSaved, actionsSlot, menuSlot, statusSlot }: Props) {
   const identity = useMemo(makeIdentity, [])
   const [conn, setConn] = useState<{ ydoc: Y.Doc; provider: WebsocketProvider } | null>(null)
   const [status, setStatus] = useState<Status>('connecting')
@@ -537,7 +543,7 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
               )}
             </div>
           </div>
-          <div className="doc-menu-row" role="menubar" aria-label="Document menus">
+          {inSlot(menuSlot, <div className="doc-menu-row" role="menubar" aria-label="Document menus">
             <Menu
               label="Document"
               items={[
@@ -593,11 +599,11 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                 })),
               ]}
             />
-          </div>
+          </div>)}
         </div>
 
-        <div className="topbar-right">
-          <div className="status-pill-wrap">
+        {inSlot(actionsSlot, <div className="topbar-right">
+          {statusSlot && createPortal(<div className="status-pill-wrap">
             <button
               className="status-pill"
               style={{ ['--pill-color' as string]: statusMeta(docStatus).color }}
@@ -623,7 +629,7 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
                 ))}
               </div>
             )}
-          </div>
+          </div>, statusSlot)}
 
           {/* Review controls appear ONLY while the doc is in review. */}
           {docStatus === 'IN_REVIEW' && (
@@ -650,24 +656,39 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
             />
           )}
 
-          <button
-            className={`comments-btn${showVersions ? ' is-active' : ''}`}
-            onClick={() => toggleVersions()}
-            title="Version history"
-          >
-            🕑 Versions
-          </button>
-          <button
-            className={`comments-btn${showComments ? ' is-active' : ''}`}
-            onClick={() => toggleComments()}
-            title="Comments"
-          >
-            💬 Comments
-          </button>
-        </div>
+          {/* Versions and Comments are floating icons at the editor's top-right */}
+        </div>)}
       </div>
 
       <div className="editor-with-panel">
+        <div className="editor-fab-row">
+          <button
+            type="button"
+            className={`comments-fab${showVersions ? ' is-active' : ''}`}
+            onClick={() => toggleVersions()}
+            title="Version history"
+            aria-label="Version history"
+            aria-pressed={showVersions}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 3v5h5" />
+              <path d="M3.05 13A9 9 0 1 0 6 5.3L3 8" />
+              <path d="M12 7v5l4 2" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`comments-fab${showComments ? ' is-active' : ''}`}
+            onClick={() => toggleComments()}
+            title="Comments"
+            aria-label="Comments"
+            aria-pressed={showComments}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+          </button>
+        </div>
         {conn ? (
           <CollabEditor
             docId={docId}
@@ -676,12 +697,8 @@ export default function Editor({ docId, initialTitle, initialStatus, role, curre
             identity={identity}
             editable={canEdit}
             font={font}
-            onChangeFont={changeFont}
             focusAnchor={focusAnchor}
             onEditorReady={setEd}
-            navOpen={navOpen}
-            onRevealNav={onRevealNav}
-            onToggleNav={onToggleNav}
             onThreadCreated={() => {
               setCommentRefresh((k) => k + 1)
               openComments()
@@ -747,13 +764,9 @@ function CollabEditor({
   identity,
   editable,
   font,
-  onChangeFont,
   focusAnchor,
   onThreadCreated,
   onEditorReady,
-  navOpen,
-  onRevealNav,
-  onToggleNav,
 }: {
   docId: string
   ydoc: Y.Doc
@@ -761,17 +774,14 @@ function CollabEditor({
   identity: Identity
   editable: boolean
   font: FontKey
-  onChangeFont: (font: FontKey) => void
   focusAnchor: string | null
   onThreadCreated: () => void
   onOpenCommentsAt?: (commentId: string) => void
   onEditorReady?: (editor: TiptapEditor | null) => void
-  navOpen?: boolean
-  onRevealNav?: () => void
-  onToggleNav?: () => void
 }) {
   // A floating "Comment" button shown over the current text selection.
   const [bubble, setBubble] = useState<{ top: number; left: number } | null>(null)
+  const [sidekickCard, setSidekickCard] = useState<{ top: number; left: number; mode: AiMode } | null>(null)
 
   const editor = useEditor({
     // Tiptap v3 defaults to rendering during the first React render, which
@@ -1125,53 +1135,6 @@ function CollabEditor({
     to: number
   } | null>(null)
 
-  const openAiPopover = useCallback(
-    (mode: AiMode = 'sentence') => {
-      if (!editor || !bubble) return
-      const { from, to } = editor.state.selection
-      if (from === to) return
-      const selectedText = editor.state.doc.textBetween(from, to, ' ')
-      const docSize = editor.state.doc.content.size
-      const contextBefore = editor.state.doc.textBetween(Math.max(0, from - 1000), from, ' ')
-      const contextAfter = editor.state.doc.textBetween(to, Math.min(docSize, to + 1000), ' ')
-
-      // Diagramify opens the large full-page workflow studio modal directly
-      if (mode === 'diagram') {
-        setDiagramifyModal({
-          selectedText,
-          contextBefore,
-          contextAfter,
-          from,
-          to,
-        })
-        setBubble(null)
-        return
-      }
-
-      // Require an AI key first — open settings if none is configured.
-      if (!getAiConfig().key) {
-        setBubble(null)
-        setAiSettingsOpen(true)
-        return
-      }
-
-      const popoverTop = bubble.top + 42
-      const clampedTop = Math.min(window.innerHeight - 440, Math.max(60, popoverTop))
-      setAiPopover({
-        top: clampedTop,
-        left: bubble.left,
-        mode,
-        selectedText,
-        contextBefore,
-        contextAfter,
-        from,
-        to,
-      })
-      setBubble(null)
-    },
-    [editor, bubble],
-  )
-
   const triggerAiFromToolbar = useCallback((targetMode: AiMode = 'sentence') => {
     if (!editor) return
     const { from, to } = editor.state.selection
@@ -1328,15 +1291,129 @@ function CollabEditor({
           style={{ top: bubble.top, left: bubble.left }}
           onMouseDown={(e) => e.preventDefault()}
         >
+          <div className="ai-bubble-sparkle-wrap">
+            <button
+              type="button"
+              className="ai-bubble-btn ai-bubble-fmt ai-bubble-sparkle"
+              onClick={() => {
+                if (bubble) setSidekickCard({ top: bubble.top + 36, left: bubble.left, mode: 'sentence' })
+                setBubble(null)
+              }}
+              title="Sidekick (AI)"
+            >
+              <GeminiSparkleIcon size={15} />
+            </button>
+          </div>
+          <div className="ai-bubble-divider" />
           <button
             type="button"
-            className="ai-bubble-btn"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('paragraph') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().setParagraph().run()}
+            title="Paragraph"
+          >
+            P
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('heading', { level: 1 }) ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+            title="Heading 1"
+          >
+            H1
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('heading', { level: 2 }) ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+            title="Heading 2"
+          >
+            H2
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('heading', { level: 3 }) ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
+            title="Heading 3"
+          >
+            H3
+          </button>
+          <div className="ai-bubble-divider" />
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('bulletList') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+            title="Bullet list"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+              <circle cx="3.5" cy="6" r="1.3" fill="currentColor" stroke="none" /><circle cx="3.5" cy="12" r="1.3" fill="currentColor" stroke="none" /><circle cx="3.5" cy="18" r="1.3" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('orderedList') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleOrderedList().run()}
+            title="Numbered list"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" />
+              <path d="M4 4h1v4" /><path d="M4 8h2" /><path d="M3.5 14.5h2v1.5h-2v2h2" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('taskList') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleTaskList().run()}
+            title="Checklist"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="11" y1="6" x2="21" y2="6" /><line x1="11" y1="12" x2="21" y2="12" /><line x1="11" y1="18" x2="21" y2="18" />
+              <polyline points="3 6 4.2 7.2 6.5 4.8" /><rect x="3" y="10.5" width="4" height="4" rx="1" /><rect x="3" y="16.5" width="4" height="4" rx="1" />
+            </svg>
+          </button>
+          <div className="ai-bubble-divider" />
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('bold') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            title="Bold (⌘B)"
+          >
+            <b>B</b>
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('italic') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            title="Italic (⌘I)"
+          >
+            <i>I</i>
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('strike') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleStrike().run()}
+            title="Strikethrough"
+          >
+            <s>S</s>
+          </button>
+          <button
+            type="button"
+            className={`ai-bubble-btn ai-bubble-fmt${editor?.isActive('code') ? ' is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleCode().run()}
+            title="Inline code"
+          >
+            {'<>'}
+          </button>
+          <div className="ai-bubble-divider" />
+          <button
+            type="button"
+            className="ai-bubble-btn ai-bubble-fmt"
             onClick={openComposer}
             title="Add a comment"
           >
             <svg
-              width="13"
-              height="13"
+              width="15"
+              height="15"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -1347,45 +1424,48 @@ function CollabEditor({
             >
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            Comment
           </button>
-          <div className="ai-bubble-divider" />
-          <button
-            type="button"
-            className="ai-bubble-btn ai-bubble-btn--ai"
-            onClick={() => openAiPopover('sentence')}
-            title="Crispify into concise sentence(s) with AI"
-          >
-            <GeminiSparkleIcon size={14} />
-            <span>Crispify</span>
-          </button>
-          <button
-            type="button"
-            className="ai-bubble-btn ai-bubble-btn--ai"
-            onClick={() => openAiPopover('bullet')}
-            title="Convert into bullet points with AI"
-          >
-            <GeminiSparkleIcon size={14} />
-            <span>Bulletize</span>
-          </button>
-          <button
-            type="button"
-            className="ai-bubble-btn ai-bubble-btn--ai"
-            onClick={() => openAiPopover('table')}
-            title="Auto-tabularize data points into rows & columns with AI"
-          >
-            <GeminiSparkleIcon size={14} />
-            <span>Tabularize</span>
-          </button>
-          <button
-            type="button"
-            className="ai-bubble-btn ai-bubble-btn--ai"
-            onClick={() => openAiPopover('diagram')}
-            title="Auto-convert workflow scenario into a Mermaid diagram with AI"
-          >
-            <GeminiSparkleIcon size={14} />
-            <span>Diagramify</span>
-          </button>
+        </div>
+      )}
+
+      {sidekickCard && editable && (
+        <div
+          className="sidekick-card"
+          style={{ top: Math.min(sidekickCard.top, window.innerHeight - 160), left: Math.min(sidekickCard.left, window.innerWidth - 440) }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="sidekick-head">
+            <span className="sidekick-title">
+              <GeminiSparkleIcon size={13} />
+              SIDEKICK (AI)
+            </span>
+            <button className="sidekick-close" onClick={() => setSidekickCard(null)} aria-label="Close">✕</button>
+          </div>
+          <div className="sidekick-body">
+            <select
+              className="sidekick-mode"
+              value={sidekickCard.mode}
+              onChange={(e) => setSidekickCard((c) => (c ? { ...c, mode: e.target.value as AiMode } : c))}
+            >
+              <option value="sentence">Crispify</option>
+              <option value="bullet">Bulletize</option>
+              <option value="table">Tabularize</option>
+              <option value="diagram">Diagramify</option>
+            </select>
+            <span className="sidekick-hint">Runs on the selected text</span>
+          </div>
+          <div className="sidekick-foot">
+            <button
+              className="sidekick-send"
+              onClick={() => {
+                const mode = sidekickCard.mode
+                setSidekickCard(null)
+                triggerAiFromToolbar(mode)
+              }}
+            >
+              Send
+            </button>
+          </div>
         </div>
       )}
 
@@ -1454,7 +1534,7 @@ function CollabEditor({
       {composer && editable && (
         <div
           className="comment-popover comment-composer"
-          style={{ top: composer.top, left: composer.left }}
+          style={{ top: Math.min(composer.top, window.innerHeight - 180), left: Math.min(composer.left, window.innerWidth - 380) }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="cp-head">
@@ -1489,18 +1569,6 @@ function CollabEditor({
           </div>
         </div>
       )}
-      {editable && (
-        <Toolbar
-          editor={editor}
-          font={font}
-          onChangeFont={onChangeFont}
-          onOpenAi={triggerAiFromToolbar}
-          onOpenSettings={() => setAiSettingsOpen(true)}
-          navOpen={navOpen}
-          onRevealNav={onRevealNav}
-          onToggleNav={onToggleNav}
-        />
-      )}
       <EditorContent editor={editor} className={`editor-content font-${font}`} />
 
       {lightbox && (
@@ -1532,7 +1600,7 @@ function CollabEditor({
       {popover && (
         <div
           className="comment-popover"
-          style={{ top: popover.top, left: popover.left }}
+          style={{ top: Math.min(popover.top, window.innerHeight - 220), left: Math.min(popover.left, window.innerWidth - 380) }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="cp-head">
